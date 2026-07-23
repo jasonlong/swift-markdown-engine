@@ -32,6 +32,8 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     /// switch-back a mismatch means the file was rewritten while backgrounded, so
     /// the now-stale undo stack is dropped. Pruned alongside `undoManagers`.
     var undoContentSnapshots: [String: String] = [:]
+    /// Collapsed list parents per document. Persistence is delegated to the embedder.
+    var collapsedOutlineItemsByDocument: [String: Set<OutlineItemReference>] = [:]
     @Binding var text: String
     @Binding var isWikiLinkActive: Bool
     var fontName: String
@@ -90,6 +92,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     var lastAppliedInlineReplacementID: UUID?
     var activeTokenIndices: Set<Int> = []
     var previousActiveTokenIndices: Set<Int> = []
+    var isAdjustingOutlineSelection = false
     var wikiLinkMetadata: [WikiLinkService.RangeKey: WikiLinkService.LinkMetadata] = [:]
     var previousBacktickCount: Int = 0
     /// Backtick census baseline captured in shouldChangeTextIn: the pre-edit

@@ -128,6 +128,13 @@ extension NativeTextViewCoordinator {
 #endif
         let lengthDelta = previousDisplayLength >= 0 ? fullLength - previousDisplayLength : Int.min
         previousDisplayLength = fullLength
+        if lengthDelta != Int.min, editedRange.location != NSNotFound {
+            let oldLength = max(0, editedRange.length - lengthDelta)
+            prepareOutlineStateForEdit(
+                affectedRange: NSRange(location: editedRange.location, length: oldLength),
+                replacementUTF16Count: editedRange.length
+            )
+        }
 
         // Parse-cache generation. shouldChangeTextIn already bumped for this
         // mutation and the selection-change re-parsed the post-edit text at
@@ -309,6 +316,7 @@ extension NativeTextViewCoordinator {
         // Raw mode: plain source — no reveal, snap-back, or inline previews.
         if configuration.rawSourceMode { return }
         if isWritingToolsActive { return }
+        if redirectSelectionFromCollapsedOutline(in: tv) { return }
         PerfTrace.checkpoint("selIn")
         defer { PerfTrace.checkpoint("selOut") }
         let selRange = tv.selectedRange()

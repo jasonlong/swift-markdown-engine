@@ -108,6 +108,35 @@ public struct NoOpEmbeddedImageProvider: EmbeddedImageProvider {
     public func fingerprint() -> AnyHashable { 0 }
 }
 
+// MARK: - Outline State
+
+/// A stable-enough reference to one collapsible Markdown list item.
+///
+/// The marker offset is updated as the document changes. The line fingerprint
+/// lets stores relocate the item when edits before it make that offset stale.
+public struct OutlineItemReference: Codable, Hashable, Sendable {
+    public var markerLocation: Int
+    public var lineFingerprint: UInt64
+
+    public init(markerLocation: Int, lineFingerprint: UInt64) {
+        self.markerLocation = markerLocation
+        self.lineFingerprint = lineFingerprint
+    }
+}
+
+/// Persists collapsed list items without adding state to Markdown source.
+public protocol OutlineStateStore: Sendable {
+    func collapsedItems(for documentID: String) -> Set<OutlineItemReference>
+    func replaceCollapsedItems(_ items: Set<OutlineItemReference>, for documentID: String)
+}
+
+/// Default outline store that keeps every list expanded.
+public struct NoOpOutlineStateStore: OutlineStateStore {
+    public init() {}
+    public func collapsedItems(for documentID: String) -> Set<OutlineItemReference> { [] }
+    public func replaceCollapsedItems(_ items: Set<OutlineItemReference>, for documentID: String) {}
+}
+
 // MARK: - Syntax Highlighting
 
 /// Provides code-block font, background color, and syntax highlighting.
@@ -317,6 +346,7 @@ public struct MarkdownEditorBus: Sendable {
 public struct MarkdownEditorServices: Sendable {
     public var wikiLinks: any WikiLinkResolver
     public var images: any EmbeddedImageProvider
+    public var outlineState: any OutlineStateStore
     public var syntaxHighlighter: any SyntaxHighlighter
     public var latex: any LatexRenderer
     public var bus: MarkdownEditorBus
@@ -324,12 +354,14 @@ public struct MarkdownEditorServices: Sendable {
     public init(
         wikiLinks: any WikiLinkResolver = NoOpWikiLinkResolver(),
         images: any EmbeddedImageProvider = NoOpEmbeddedImageProvider(),
+        outlineState: any OutlineStateStore = NoOpOutlineStateStore(),
         syntaxHighlighter: any SyntaxHighlighter = PlainTextSyntaxHighlighter(),
         latex: any LatexRenderer = NoOpLatexRenderer(),
         bus: MarkdownEditorBus = .default
     ) {
         self.wikiLinks = wikiLinks
         self.images = images
+        self.outlineState = outlineState
         self.syntaxHighlighter = syntaxHighlighter
         self.latex = latex
         self.bus = bus

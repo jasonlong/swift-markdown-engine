@@ -22,8 +22,16 @@ extension NSAttributedString.Key {
     /// paints that many vertical bars in the left gutter.
     static let blockquoteLevel = NSAttributedString.Key("BlockquoteLevel")
     /// Marks a bullet-list marker char (`-`/`*`/`+`) whose glyph is hidden so
-    /// the fragment can paint a `•` in its place. Set to `true`.
+    /// the fragment can paint a vector bullet in its place. Set to `true`.
     static let bulletMarker = NSAttributedString.Key("BulletListMarker")
+    /// Int indentation depth for subtle outliner ancestor guides.
+    static let outlineDepth = NSAttributedString.Key("OutlineDepth")
+    /// Marks a bullet that owns nested list-item descendants.
+    static let outlineHasChildren = NSAttributedString.Key("OutlineHasChildren")
+    /// Marks a parent bullet whose descendants are currently collapsed.
+    static let outlineCollapsed = NSAttributedString.Key("OutlineCollapsed")
+    /// Marks descendant source hidden by a collapsed parent.
+    static let outlineHidden = NSAttributedString.Key("OutlineHidden")
     /// CGFloat — natural image width; presence flags block as overlay-rendered.
     static let scrollableBlockNaturalWidth = NSAttributedString.Key("ScrollableBlockNaturalWidth")
     /// Int — hash of source text; key for overlay reconcile + offset persistence.
@@ -81,10 +89,13 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         // 2. LaTeX images (behind text — hidden markers are invisible anyway)
         drawLatexImages(at: point, in: context)
 
-        // 3. Normal text
+        // 3. Subtle ancestor guides for nested outline items
+        drawOutlineGuides(at: point, in: context)
+
+        // 4. Normal text
         super.draw(at: point, in: context)
 
-        // 4. Task checkboxes (on top of hidden [ ]/[x] markers)
+        // 5. Task checkboxes (on top of hidden [ ]/[x] markers)
         drawTaskCheckboxes(at: point, in: context)
 
         // 4b. Bullet glyphs (on top of hidden -/*/+ markers)
@@ -506,9 +517,47 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         }
     }
 
+    // MARK: - Outline Guides
+
+    private func drawOutlineGuides(at point: CGPoint, in context: CGContext) {
+        guard let textStorage, let range = fragmentNSRange, range.length > 0 else { return }
+        let textView = textLayoutManager?.textContainer?.textView as? NativeTextView
+        let indent = textView?.configuration.lists.indentPerLevel
+            ?? MarkdownEditorConfiguration.default.lists.indentPerLevel
+        let color = (textView?.configuration.theme.mutedText ?? .secondaryLabelColor)
+            .withAlphaComponent(0.16)
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+        color.setStroke()
+
+        textStorage.enumerateAttribute(.outlineDepth, in: range, options: []) { [weak self] value, attrRange, _ in
+            guard let self, let depth = value as? Int, depth > 0,
+                  textStorage.attribute(.outlineHidden, at: attrRange.location, effectiveRange: nil) == nil,
+                  let position = self.drawPosition(forDocumentCharAt: attrRange.location, point: point) else {
+                return
+            }
+            let font = (textStorage.attribute(.font, at: attrRange.location, effectiveRange: nil) as? NSFont)
+                ?? textView?.baseFont ?? .systemFont(ofSize: NSFont.systemFontSize)
+            let paragraph = textStorage.attribute(.paragraphStyle, at: attrRange.location, effectiveRange: nil)
+                as? NSParagraphStyle
+            let top = position.baselineY - font.ascender
+            let bottom = position.baselineY - font.descender + (paragraph?.paragraphSpacing ?? 0)
+            for ancestor in 1...depth {
+                let x = position.x - CGFloat(ancestor) * indent + 1.5
+                let path = NSBezierPath()
+                path.lineWidth = 1
+                path.move(to: CGPoint(x: x, y: top))
+                path.line(to: CGPoint(x: x, y: bottom))
+                path.stroke()
+            }
+        }
+    }
+
     // MARK: - Bullet Markers
 
-    /// Paint a `•` over every hidden bullet marker (`.bulletMarker`). The
+    /// Paint a vector dot over every hidden bullet marker (`.bulletMarker`). The
     /// glyph is drawn in the same font as the source so its baseline matches
     /// the surrounding text, and centered within the original marker char's
     /// advance so a `•` of a different width still sits where `-`/`*`/`+` was.
@@ -529,7 +578,8 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         let storageString = ts.string as NSString
 
         ts.enumerateAttribute(.bulletMarker, in: range, options: []) { [weak self] value, attrRange, _ in
-            guard let self, (value as? Bool) == true else { return }
+            guard let self, (value as? Bool) == true,
+                  ts.attribute(.outlineHidden, at: attrRange.location, effectiveRange: nil) == nil else { return }
             guard let pos = self.drawPosition(forDocumentCharAt: attrRange.location, point: point) else { return }
 
             let font = (ts.attribute(.font, at: attrRange.location, effectiveRange: nil) as? NSFont)
@@ -544,16 +594,53 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             // an empty slot wherever the selection anchor wasn't in the marker.)
             let isSelected = selectionRanges.contains(where: { NSIntersectionRange($0, attrRange).length > 0 })
             let raw = storageString.substring(with: attrRange)
-            let glyph = (isSelected ? raw : "•") as NSString
-            let glyphAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.bodyText]
-
             let markerWidth = (raw as NSString).size(withAttributes: [.font: font]).width
-            let glyphWidth = glyph.size(withAttributes: glyphAttrs).width
-            let xOffset = max(0, (markerWidth - glyphWidth) / 2)
-            // Flipped context: text origin is its top edge, baseline sits one
-            // ascent below — so top = baseline − ascent aligns the glyph.
-            let topY = pos.baselineY - font.ascender
-            glyph.draw(at: CGPoint(x: pos.x + xOffset, y: topY), withAttributes: glyphAttrs)
+            if isSelected {
+                let glyph = raw as NSString
+                let glyphAttributes: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: theme.bodyText,
+                ]
+                let glyphWidth = glyph.size(withAttributes: glyphAttributes).width
+                let xOffset = max(0, (markerWidth - glyphWidth) / 2)
+                glyph.draw(
+                    at: CGPoint(x: pos.x + xOffset, y: pos.baselineY - font.ascender),
+                    withAttributes: glyphAttributes
+                )
+                return
+            }
+
+            let center = CGPoint(
+                x: pos.x + markerWidth / 2,
+                y: pos.baselineY - font.xHeight / 2
+            )
+            let dotDiameter = max(4.5, min(6, font.pointSize * 0.34))
+            let isCollapsed = (ts.attribute(
+                .outlineCollapsed,
+                at: attrRange.location,
+                effectiveRange: nil
+            ) as? Bool) == true
+            if isCollapsed {
+                let haloDiameter = dotDiameter + 9
+                theme.mutedText.withAlphaComponent(0.18).setFill()
+                NSBezierPath(
+                    ovalIn: CGRect(
+                        x: center.x - haloDiameter / 2,
+                        y: center.y - haloDiameter / 2,
+                        width: haloDiameter,
+                        height: haloDiameter
+                    )
+                ).fill()
+            }
+            theme.mutedText.setFill()
+            NSBezierPath(
+                ovalIn: CGRect(
+                    x: center.x - dotDiameter / 2,
+                    y: center.y - dotDiameter / 2,
+                    width: dotDiameter,
+                    height: dotDiameter
+                )
+            ).fill()
         }
     }
 

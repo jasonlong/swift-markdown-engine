@@ -561,6 +561,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             // across a file switch.
             textView.breakUndoCoalescing()
             context.coordinator.documentId = documentId
+            context.coordinator.loadOutlineState(for: documentId)
             // Drop the incoming document's undo stack if its text changed while
             // switched away — its recorded ranges are now stale.
             context.coordinator.invalidateUndoIfContentDiverged(for: documentId, incomingText: text)
