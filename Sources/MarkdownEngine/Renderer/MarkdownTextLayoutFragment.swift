@@ -658,7 +658,8 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         NSGraphicsContext.current = nsContext
 
         ts.enumerateAttribute(.taskCheckbox, in: range, options: []) { [weak self] value, attrRange, _ in
-            guard let self, value != nil else { return }
+            guard let self, value != nil,
+                  ts.attribute(.outlineHidden, at: attrRange.location, effectiveRange: nil) == nil else { return }
             // A `.taskCheckbox` range means the styler cleared the raw `- [ ]`
             // (and collapsed the box's advance), so the box must ALWAYS be
             // drawn — including while the range sits inside a selection. An

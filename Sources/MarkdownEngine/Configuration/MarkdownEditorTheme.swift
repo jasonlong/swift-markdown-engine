@@ -28,8 +28,10 @@ public struct MarkdownEditorTheme: Sendable {
 
     // MARK: Text colors
 
-    /// Foreground color for plain body text and the typing caret.
+    /// Foreground color for plain body text.
     public var bodyText: NSColor
+    /// Color of the blinking text insertion point.
+    public var insertionPoint: NSColor
     /// Foreground color for de-emphasized text and most syntax markers.
     /// Defaults to `secondaryLabelColor` so it tracks the system style.
     public var mutedText: NSColor
@@ -83,6 +85,7 @@ public struct MarkdownEditorTheme: Sendable {
 
     public init(
         bodyText: NSColor = .labelColor,
+        insertionPoint: NSColor = .labelColor,
         mutedText: NSColor = .secondaryLabelColor,
         disabledText: NSColor = .tertiaryLabelColor,
         headingMarker: NSColor = .gray,
@@ -96,6 +99,7 @@ public struct MarkdownEditorTheme: Sendable {
         highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4)
     ) {
         self.bodyText = bodyText
+        self.insertionPoint = insertionPoint
         self.mutedText = mutedText
         self.disabledText = disabledText
         self.headingMarker = headingMarker
