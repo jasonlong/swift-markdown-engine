@@ -713,7 +713,23 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                     symbolConfig = sizeConfig.applying(colorConfig)
                 }
                 let symbol = baseSymbol.withSymbolConfiguration(symbolConfig) ?? baseSymbol
-                symbol.draw(in: iconRect)
+                let naturalSize = symbol.size
+                guard naturalSize.width > 0, naturalSize.height > 0 else { return }
+                let fitScale = min(
+                    iconRect.width / naturalSize.width,
+                    iconRect.height / naturalSize.height
+                )
+                let fittedSize = CGSize(
+                    width: naturalSize.width * fitScale,
+                    height: naturalSize.height * fitScale
+                )
+                let fittedRect = CGRect(
+                    x: iconRect.midX - fittedSize.width / 2,
+                    y: iconRect.midY - fittedSize.height / 2,
+                    width: fittedSize.width,
+                    height: fittedSize.height
+                )
+                symbol.draw(in: fittedRect)
             }
         }
     }

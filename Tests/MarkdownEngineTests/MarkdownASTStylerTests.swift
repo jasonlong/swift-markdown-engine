@@ -353,6 +353,7 @@ struct TaskCheckboxGeometryStylerTests {
     func customListGeometry() {
         var configuration = MarkdownEditorConfiguration.default
         configuration.lists.firstLevelIndent = 0
+        configuration.lists.indentPerLevel = 32
         configuration.lists.markerContentGap = 8
         configuration.taskCheckbox.showsListBullet = true
 
@@ -360,6 +361,13 @@ struct TaskCheckboxGeometryStylerTests {
         #expect(paragraphStyle(in: bulletAttributes, at: 0)?.firstLineHeadIndent == 0)
         #expect(abs((headIndent(in: bulletAttributes, at: 0) ?? -1) - width("- ") - 8) < 0.01)
         #expect(attribute(.kern, in: bulletAttributes, at: 0) as? CGFloat == 8)
+
+        let nestedAttributes = style("  - nested", configuration: configuration)
+        let nestedFirstLineIndent = paragraphStyle(
+            in: nestedAttributes,
+            at: 0
+        )?.firstLineHeadIndent ?? -1
+        #expect(abs(nestedFirstLineIndent + width("  ") - 32) < 0.01)
 
         let taskAttributes = style("- [ ] task", configuration: configuration)
         let taskAdvance = 8 + TaskCheckboxGeometry.size(for: baseFont) + TaskCheckboxGeometry.gap

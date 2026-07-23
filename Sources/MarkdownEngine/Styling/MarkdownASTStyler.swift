@@ -248,10 +248,15 @@ enum MarkdownASTStyler {
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
         ps.defaultTabInterval = ctx.config.lists.indentPerLevel
+        let sourceWhitespaceWidth = (ws as NSString).size(withAttributes: [
+            .font: ctx.baseFont,
+            .paragraphStyle: ps,
+        ]).width
+        // Markdown accepts tabs or spaces for nesting. Compensate for their
+        // natural advance so both forms land on the configured visual grid.
         ps.firstLineHeadIndent = ctx.config.lists.firstLevelIndent
-        // Wrapped lines hang under the first line's content. The source
-        // indentation supplies `depthIndent` on the first line; the paragraph
-        // style supplies the equivalent position to continuation lines.
+            + depthIndent - sourceWhitespaceWidth
+        // Wrapped lines hang under the first line's content.
         ps.headIndent = ctx.config.lists.firstLevelIndent + depthIndent
             + markerWidth + additionalMarkerAdvance
         attrs.append((line, [.paragraphStyle: ps]))
