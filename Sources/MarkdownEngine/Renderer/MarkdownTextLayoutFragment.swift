@@ -542,8 +542,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 ?? textView?.baseFont ?? .systemFont(ofSize: NSFont.systemFontSize)
             let paragraph = textStorage.attribute(.paragraphStyle, at: attrRange.location, effectiveRange: nil)
                 as? NSParagraphStyle
-            let top = position.baselineY - font.ascender
-            let bottom = position.baselineY - font.descender + (paragraph?.paragraphSpacing ?? 0)
+            let top = position.baselineY - font.ascender - 2
+            let bottom = position.baselineY - font.descender
+                + (paragraph?.paragraphSpacing ?? 0) + 2
             for ancestor in 1...depth {
                 let x = position.x - CGFloat(ancestor) * indent + 1.5
                 let path = NSBezierPath()
