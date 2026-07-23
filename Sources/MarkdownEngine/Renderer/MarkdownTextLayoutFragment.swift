@@ -697,18 +697,46 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration
                 ?? .default
             let style = configuration.taskCheckbox
+            func drawSymbol(
+                named symbolName: String,
+                fallbackName: String,
+                in rect: CGRect,
+                tint: NSColor,
+                weight: NSFont.Weight
+            ) {
+                guard let baseSymbol = NSImage(
+                    systemSymbolName: symbolName,
+                    accessibilityDescription: nil
+                ) ?? NSImage(systemSymbolName: fallbackName, accessibilityDescription: nil) else {
+                    return
+                }
+                let sizeConfig = NSImage.SymbolConfiguration(pointSize: rect.height, weight: weight)
+                let colorConfig = NSImage.SymbolConfiguration(hierarchicalColor: tint)
+                let symbolConfig = sizeConfig.applying(colorConfig)
+                let symbol = baseSymbol.withSymbolConfiguration(symbolConfig) ?? baseSymbol
+                symbol.draw(in: rect)
+            }
+
             let symbolName = isChecked ? style.checkedSymbolName : style.uncheckedSymbolName
             let fallbackName = isChecked
                 ? TaskCheckboxStyle.default.checkedSymbolName
                 : TaskCheckboxStyle.default.uncheckedSymbolName
-            if let baseSymbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
-                ?? NSImage(systemSymbolName: fallbackName, accessibilityDescription: nil) {
-                let sizeConfig = NSImage.SymbolConfiguration(pointSize: iconRect.height, weight: .regular)
-                let tint = isChecked ? configuration.theme.bodyText : configuration.theme.mutedText
-                let colorConfig = NSImage.SymbolConfiguration(hierarchicalColor: tint)
-                let symbolConfig = sizeConfig.applying(colorConfig)
-                let symbol = baseSymbol.withSymbolConfiguration(symbolConfig) ?? baseSymbol
-                symbol.draw(in: iconRect)
+            drawSymbol(
+                named: symbolName,
+                fallbackName: fallbackName,
+                in: iconRect,
+                tint: isChecked ? configuration.theme.bodyText : configuration.theme.mutedText,
+                weight: .regular
+            )
+            if isChecked, let glyphName = style.checkedGlyphSymbolName {
+                let glyphRect = iconRect.insetBy(dx: iconRect.width * 0.2, dy: iconRect.height * 0.2)
+                drawSymbol(
+                    named: glyphName,
+                    fallbackName: "checkmark",
+                    in: glyphRect,
+                    tint: .textBackgroundColor,
+                    weight: .semibold
+                )
             }
         }
     }

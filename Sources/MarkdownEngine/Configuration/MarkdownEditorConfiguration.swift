@@ -347,18 +347,22 @@ public struct ListStyle: Sendable {
 public struct TaskCheckboxStyle: Sendable {
     /// SF Symbol drawn for an unchecked task item (`[ ]`).
     public var uncheckedSymbolName: String
-    /// SF Symbol drawn for a checked task item (`[x]`).
+    /// SF Symbol drawn for a checked task item's box (`[x]`).
     public var checkedSymbolName: String
+    /// Optional SF Symbol drawn over the checked box, such as `checkmark`.
+    public var checkedGlyphSymbolName: String?
     /// Whether task items retain the unordered-list bullet before the checkbox.
     public var showsListBullet: Bool
 
     public init(
         uncheckedSymbolName: String = "square",
         checkedSymbolName: String = "checkmark.square.fill",
+        checkedGlyphSymbolName: String? = nil,
         showsListBullet: Bool = false
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
         self.checkedSymbolName = checkedSymbolName
+        self.checkedGlyphSymbolName = checkedGlyphSymbolName
         self.showsListBullet = showsListBullet
     }
 
