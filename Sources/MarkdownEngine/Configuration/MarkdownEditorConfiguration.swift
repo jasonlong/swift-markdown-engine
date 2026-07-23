@@ -349,16 +349,20 @@ public struct TaskCheckboxStyle: Sendable {
     public var uncheckedSymbolName: String
     /// SF Symbol drawn for a checked task item (`[x]`).
     public var checkedSymbolName: String
+    /// Whether symbols use their native monochrome rendering instead of a hierarchical tint.
+    public var usesNativeSymbolRendering: Bool
     /// Whether task items retain the unordered-list bullet before the checkbox.
     public var showsListBullet: Bool
 
     public init(
         uncheckedSymbolName: String = "square",
         checkedSymbolName: String = "checkmark.square.fill",
+        usesNativeSymbolRendering: Bool = false,
         showsListBullet: Bool = false
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
         self.checkedSymbolName = checkedSymbolName
+        self.usesNativeSymbolRendering = usesNativeSymbolRendering
         self.showsListBullet = showsListBullet
     }
 
