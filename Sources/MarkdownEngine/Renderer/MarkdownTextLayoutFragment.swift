@@ -524,8 +524,10 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         let textView = textLayoutManager?.textContainer?.textView as? NativeTextView
         let indent = textView?.configuration.lists.indentPerLevel
             ?? MarkdownEditorConfiguration.default.lists.indentPerLevel
+        let guideOpacity = textView?.configuration.lists.guideOpacity
+            ?? MarkdownEditorConfiguration.default.lists.guideOpacity
         let color = (textView?.configuration.theme.mutedText ?? .secondaryLabelColor)
-            .withAlphaComponent(0.16)
+            .withAlphaComponent(max(0, min(1, guideOpacity)))
 
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }

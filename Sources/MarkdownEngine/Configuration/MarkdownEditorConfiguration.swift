@@ -304,6 +304,8 @@ public struct ListStyle: Sendable {
     public var indentPerLevel: CGFloat
     /// Additional horizontal space after an unordered-list marker.
     public var markerContentGap: CGFloat
+    /// Opacity of the vertical guides beneath expanded outline parents.
+    public var guideOpacity: CGFloat
     /// Maximum nesting level reachable by pressing Tab inside a list.
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
@@ -315,6 +317,7 @@ public struct ListStyle: Sendable {
         firstLevelIndent: CGFloat = 27.5,
         indentPerLevel: CGFloat = 27.5,
         markerContentGap: CGFloat = 0,
+        guideOpacity: CGFloat = 0.16,
         maximumNestingLevel: Int = 3,
         extraLineHeight: CGFloat = 2
     ) {
@@ -323,6 +326,7 @@ public struct ListStyle: Sendable {
         self.firstLevelIndent = firstLevelIndent
         self.indentPerLevel = indentPerLevel
         self.markerContentGap = markerContentGap
+        self.guideOpacity = guideOpacity
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
     }

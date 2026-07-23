@@ -21,9 +21,16 @@ extension NativeTextView {
                 forCharacterRange: attributeRange,
                 in: textContainer
             )
+            let font = (textStorage.attribute(
+                .font,
+                at: attributeRange.location,
+                effectiveRange: nil
+            ) as? NSFont) ?? baseFont
+            let rawMarker = (textStorage.string as NSString).substring(with: attributeRange)
+            let markerWidth = (rawMarker as NSString).size(withAttributes: [.font: font]).width
             let hitSize = max(16, anchor.height)
             let hitRect = CGRect(
-                x: anchor.midX - hitSize / 2,
+                x: anchor.minX + markerWidth / 2 - hitSize / 2,
                 y: anchor.midY - hitSize / 2,
                 width: hitSize,
                 height: hitSize
