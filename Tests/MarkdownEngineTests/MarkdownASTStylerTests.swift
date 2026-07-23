@@ -355,6 +355,8 @@ struct TaskCheckboxGeometryStylerTests {
         configuration.lists.firstLevelIndent = 0
         configuration.lists.indentPerLevel = 32
         configuration.lists.markerContentGap = 8
+        configuration.taskCheckbox.sizeScale = 1.1
+        configuration.taskCheckbox.checkedTextColor = .secondaryLabelColor
         configuration.taskCheckbox.showsListBullet = true
 
         let bulletAttributes = style("- bullet", configuration: configuration)
@@ -370,11 +372,18 @@ struct TaskCheckboxGeometryStylerTests {
         #expect(abs(nestedFirstLineIndent + width("  ") - 32) < 0.01)
 
         let taskAttributes = style("- [ ] task", configuration: configuration)
-        let taskAdvance = 8 + TaskCheckboxGeometry.size(for: baseFont) + TaskCheckboxGeometry.gap
+        let taskAdvance = 8 + TaskCheckboxGeometry.size(for: baseFont, scale: 1.1)
+            + TaskCheckboxGeometry.gap
         #expect(paragraphStyle(in: taskAttributes, at: 0)?.firstLineHeadIndent == 0)
         #expect(abs((headIndent(in: taskAttributes, at: 0) ?? -1) - width("- ") - taskAdvance) < 0.01)
         #expect(attribute(.kern, in: taskAttributes, at: 0) as? CGFloat == taskAdvance)
         #expect(attribute(.bulletMarker, in: taskAttributes, at: 0) as? Bool == true)
+
+        let checkedAttributes = style("- [x] task", configuration: configuration)
+        #expect(
+            attribute(.foregroundColor, in: checkedAttributes, at: 6) as? NSColor
+                == .secondaryLabelColor
+        )
     }
 
     @Test("revealed task (caret in syntax): no collapse, indent uses the full raw width")

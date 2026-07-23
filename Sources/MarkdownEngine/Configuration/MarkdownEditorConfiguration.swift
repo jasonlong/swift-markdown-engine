@@ -342,8 +342,8 @@ public struct ListStyle: Sendable {
 /// example `"circle"` / `"checkmark.circle.fill"`. A name that doesn't
 /// resolve falls back to the corresponding default symbol at draw time, so a
 /// typo degrades to the stock look instead of drawing nothing. Tint colors
-/// stay theme-driven (`MarkdownEditorTheme/mutedText` unchecked,
-/// `MarkdownEditorTheme/bodyText` checked).
+/// remain theme-driven unless the style requests native rendering or supplies
+/// an explicit checked-state tint.
 public struct TaskCheckboxStyle: Sendable {
     /// SF Symbol drawn for an unchecked task item (`[ ]`).
     public var uncheckedSymbolName: String
@@ -351,6 +351,12 @@ public struct TaskCheckboxStyle: Sendable {
     public var checkedSymbolName: String
     /// Whether symbols use their native monochrome rendering instead of a hierarchical tint.
     public var usesNativeSymbolRendering: Bool
+    /// Multiplier applied to the checkbox symbol's natural editor size.
+    public var sizeScale: CGFloat
+    /// Optional fill tint for a checked symbol.
+    public var checkedTint: NSColor?
+    /// Optional foreground color for checked task text.
+    public var checkedTextColor: NSColor?
     /// Whether task items retain the unordered-list bullet before the checkbox.
     public var showsListBullet: Bool
 
@@ -358,11 +364,17 @@ public struct TaskCheckboxStyle: Sendable {
         uncheckedSymbolName: String = "square",
         checkedSymbolName: String = "checkmark.square.fill",
         usesNativeSymbolRendering: Bool = false,
+        sizeScale: CGFloat = 1,
+        checkedTint: NSColor? = nil,
+        checkedTextColor: NSColor? = nil,
         showsListBullet: Bool = false
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
         self.checkedSymbolName = checkedSymbolName
         self.usesNativeSymbolRendering = usesNativeSymbolRendering
+        self.sizeScale = sizeScale
+        self.checkedTint = checkedTint
+        self.checkedTextColor = checkedTextColor
         self.showsListBullet = showsListBullet
     }
 

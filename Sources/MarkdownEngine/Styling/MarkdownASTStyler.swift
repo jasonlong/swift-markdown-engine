@@ -235,7 +235,10 @@ enum MarkdownASTStyler {
             ? ctx.config.lists.markerContentGap
             : 0
         let taskCheckboxAdvance = showsTaskBullet
-            ? TaskCheckboxGeometry.size(for: ctx.baseFont) + TaskCheckboxGeometry.gap
+            ? TaskCheckboxGeometry.size(
+                for: ctx.baseFont,
+                scale: ctx.config.taskCheckbox.sizeScale
+            ) + TaskCheckboxGeometry.gap
             : 0
         let additionalMarkerAdvance = markerContentGap + taskCheckboxAdvance
         let depthIndent = CGFloat(MarkdownLists.indentLevel(from: ws)) * ctx.config.lists.indentPerLevel
@@ -285,10 +288,21 @@ enum MarkdownASTStyler {
                 attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
             }
             if item.checked, NSMaxRange(item.range) > NSMaxRange(box) {
-                attrs.append((NSRange(location: NSMaxRange(box), length: NSMaxRange(item.range) - NSMaxRange(box)), [
+                var checkedAttributes: [NSAttributedString.Key: Any] = [
                     .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                    .strikethroughColor: ctx.theme.strikethroughColor,
-                ]))
+                    .strikethroughColor: ctx.config.taskCheckbox.checkedTextColor
+                        ?? ctx.theme.strikethroughColor,
+                ]
+                if let checkedTextColor = ctx.config.taskCheckbox.checkedTextColor {
+                    checkedAttributes[.foregroundColor] = checkedTextColor
+                }
+                attrs.append((
+                    NSRange(
+                        location: NSMaxRange(box),
+                        length: NSMaxRange(item.range) - NSMaxRange(box)
+                    ),
+                    checkedAttributes
+                ))
             }
         } else if !item.ordered {
             if bulletRevealed { return }

@@ -19,13 +19,14 @@ enum TaskCheckboxGeometry {
     /// Gap between the box's right edge and the task content's left edge.
     static let gap: CGFloat = 2.0
 
-    /// Side length of the square for the given (body) font.
-    static func size(for font: NSFont) -> CGFloat {
+    /// Side length of the square for the given body font and configured scale.
+    static func size(for font: NSFont, scale: CGFloat = 1) -> CGFloat {
         let ascent = max(0, font.ascender)
         let descent = max(0, -font.descender)
         let fontHeight = max(1, ceil(ascent + descent))
         let markerWidth = ("[ ]" as NSString).size(withAttributes: [.font: font]).width
-        return max(1.0, min(floor(fontHeight * 1.2), floor(markerWidth * 1.2)))
+        let baseSize = max(1.0, min(floor(fontHeight * 1.2), floor(markerWidth * 1.2)))
+        return baseSize * max(0.5, min(2, scale))
     }
 
     /// Left edge of the square: right-aligned to the content start x with `gap`.
