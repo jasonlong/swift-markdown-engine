@@ -31,6 +31,7 @@ public struct MarkdownEditorConfiguration: Sendable {
     public var markers: MarkerStyle
     public var codeBlock: CodeBlockStyle
     public var inlineCode: InlineCodeStyle
+    public var strong: StrongStyle
     public var lists: ListStyle
     public var taskCheckbox: TaskCheckboxStyle
     public var headings: HeadingStyle
@@ -81,6 +82,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         markers: MarkerStyle = .default,
         codeBlock: CodeBlockStyle = .default,
         inlineCode: InlineCodeStyle = .default,
+        strong: StrongStyle = .default,
         lists: ListStyle = .default,
         taskCheckbox: TaskCheckboxStyle = .default,
         headings: HeadingStyle = .default,
@@ -106,6 +108,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         self.markers = markers
         self.codeBlock = codeBlock
         self.inlineCode = inlineCode
+        self.strong = strong
         self.lists = lists
         self.taskCheckbox = taskCheckbox
         self.headings = headings
@@ -271,6 +274,20 @@ public struct InlineCodeStyle: Sendable {
     public static let `default` = InlineCodeStyle()
 }
 
+// MARK: - Strong emphasis
+
+/// Styling for strong-emphasis (`**bold**`) spans.
+public struct StrongStyle: Sendable {
+    /// Font weight used for strong-emphasis content.
+    public var fontWeight: NSFont.Weight
+
+    public init(fontWeight: NSFont.Weight = .bold) {
+        self.fontWeight = fontWeight
+    }
+
+    public static let `default` = StrongStyle()
+}
+
 // MARK: - Lists
 
 /// Behavior toggles and metrics for ordered / unordered list editing.
@@ -341,13 +358,17 @@ public struct HeadingStyle: Sendable {
     public var fontMultipliers: [CGFloat]
     /// Top spacing in `em` units per heading level (1...6).
     public var topSpacingEm: [CGFloat]
+    /// Font weight shared by all heading levels.
+    public var fontWeight: NSFont.Weight
 
     public init(
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
-        topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10]
+        topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
+        fontWeight: NSFont.Weight = .bold
     ) {
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
+        self.fontWeight = fontWeight
     }
 
     public func fontMultiplier(for level: Int) -> CGFloat {
@@ -476,10 +497,17 @@ public struct ParagraphStyle: Sendable {
     public var spacingFactor: CGFloat
     /// Extra height (points) added to the default paragraph line height.
     public var lineHeightExtraSpacing: CGFloat
+    /// Height of an empty Markdown line relative to the normal body line height.
+    public var blankLineHeightScale: CGFloat
 
-    public init(spacingFactor: CGFloat = 0.3, lineHeightExtraSpacing: CGFloat = 2) {
+    public init(
+        spacingFactor: CGFloat = 0.3,
+        lineHeightExtraSpacing: CGFloat = 2,
+        blankLineHeightScale: CGFloat = 1
+    ) {
         self.spacingFactor = spacingFactor
         self.lineHeightExtraSpacing = lineHeightExtraSpacing
+        self.blankLineHeightScale = blankLineHeightScale
     }
 
     public static let `default` = ParagraphStyle()

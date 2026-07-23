@@ -65,6 +65,75 @@ struct MarkdownASTStylerTests {
         #expect(o?.fontDescriptor.symbolicTraits.contains([.bold, .italic]) == true)
     }
 
+    @Test("heading weight is configurable")
+    func configurableHeadingWeight() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.headings.fontWeight = .semibold
+
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: "# Heading",
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let heading = font(in: attrs, at: 2)
+        let traits = heading?.fontDescriptor.object(forKey: .traits)
+            as? [NSFontDescriptor.TraitKey: Any]
+        let weight = traits?[.weight] as? NSNumber
+
+        #expect(abs((weight?.doubleValue ?? 0) - Double(NSFont.Weight.semibold.rawValue)) < 0.001)
+        #expect(heading?.pointSize == base * configuration.headings.fontMultiplier(for: 1))
+    }
+
+    @Test("strong-emphasis weight is configurable")
+    func configurableStrongWeight() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.strong.fontWeight = .semibold
+
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: "**Strong**",
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let strong = font(in: attrs, at: 2)
+        let traits = strong?.fontDescriptor.object(forKey: .traits)
+            as? [NSFontDescriptor.TraitKey: Any]
+        let weight = traits?[.weight] as? NSNumber
+
+        #expect(abs((weight?.doubleValue ?? 0) - Double(NSFont.Weight.semibold.rawValue)) < 0.001)
+
+        let nestedAttrs = MarkdownASTStyler.styleAttributes(
+            text: "*outer **inner** outer*",
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let nestedStrong = font(in: nestedAttrs, at: 9)
+        #expect(nestedStrong?.fontDescriptor.symbolicTraits.contains([.bold, .italic]) == true)
+    }
+
+    @Test("blank line height is configurable")
+    func configurableBlankLineHeight() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.paragraph.blankLineHeightScale = 0.5
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: "first\n\nsecond",
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let blankLineStyle = attrs.reversed().first { entry in
+            NSLocationInRange(6, entry.range) && entry.attributes[.paragraphStyle] != nil
+        }?.attributes[.paragraphStyle] as? NSParagraphStyle
+        let bodyFont = NSFont(name: fontName, size: base) ?? .systemFont(ofSize: base)
+        let bodyLineHeight = ceil(bodyFont.ascender - bodyFont.descender + bodyFont.leading)
+            + configuration.paragraph.lineHeightExtraSpacing
+
+        #expect(blankLineStyle?.minimumLineHeight == bodyLineHeight * 0.5)
+        #expect(blankLineStyle?.paragraphSpacing == 0)
+    }
+
     @Test("nested emphasis in a paragraph composes bold+italic")
     func paragraphNestedEmphasis() {
         let attrs = MarkdownASTStyler.styleAttributes(text: "**a *b* c**", fontName: fontName, fontSize: base)

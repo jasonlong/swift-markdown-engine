@@ -366,7 +366,7 @@ enum MarkdownASTStyler {
             let multiplier = ctx.config.headings.fontMultiplier(for: level)
             let headingBase = NSFont(name: ctx.fontName, size: ctx.baseFont.pointSize * multiplier)
                 ?? .systemFont(ofSize: ctx.baseFont.pointSize * multiplier)
-            let headingFont = adding(.bold, to: headingBase)
+            let headingFont = applying(weight: ctx.config.headings.fontWeight, to: headingBase)
             let lineHeight = ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
             let headingPara = NSMutableParagraphStyle()
             headingPara.minimumLineHeight = lineHeight
@@ -396,9 +396,26 @@ enum MarkdownASTStyler {
             styleThematicBreak(range: range, ctx: ctx, into: &attrs)
         case .ext(let node):
             styleExtensionBlock(node, font: font, ctx: ctx, into: &attrs)
-        case .blockLatex, .table, .blank:
+        case .blank(let range):
+            styleBlankLine(range: range, ctx: ctx, into: &attrs)
+        case .blockLatex, .table:
             break   // NSImage rendering ported next
         }
+    }
+
+    private static func styleBlankLine(range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]) {
+        let scale = ctx.config.paragraph.blankLineHeightScale
+        guard scale != 1 else { return }
+        let lineHeight = max(
+            1,
+            (ctx.baseLineHeight + ctx.config.paragraph.lineHeightExtraSpacing) * scale
+        )
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.paragraphSpacing = 0
+        paragraph.paragraphSpacingBefore = 0
+        attrs.append((range, [.paragraphStyle: paragraph]))
     }
 
     /// Extension fenced block: the extension supplies content ATTRIBUTES only;
@@ -545,7 +562,11 @@ enum MarkdownASTStyler {
                 break
 
             case .emphasis(let kind, let range, let markers, let children):
-                let composed = adding(traits(for: kind), to: font)
+                let composed = applying(
+                    emphasis: kind,
+                    weight: ctx.config.strong.fontWeight,
+                    to: font
+                )
                 attrs.append((content(of: markers), [.font: composed]))
                 if ctx.isActive(range) {
                     for marker in markers { attrs.append((marker, [.foregroundColor: ctx.theme.mutedText])) }
@@ -697,12 +718,33 @@ enum MarkdownASTStyler {
 
     // MARK: - Helpers
 
-    private static func traits(for kind: EmphasisKind) -> NSFontDescriptor.SymbolicTraits {
-        switch kind {
-        case .italic: return .italic
-        case .bold: return .bold
-        case .boldItalic: return [.bold, .italic]
+    private static func applying(
+        emphasis: EmphasisKind,
+        weight: NSFont.Weight,
+        to font: NSFont
+    ) -> NSFont {
+        switch emphasis {
+        case .italic:
+            return adding(.italic, to: font)
+        case .bold:
+            return applying(weight: weight, to: font)
+        case .boldItalic:
+            return adding(.italic, to: applying(weight: weight, to: font))
         }
+    }
+
+    private static func applying(weight: NSFont.Weight, to font: NSFont) -> NSFont {
+        guard weight != .bold, let familyName = font.familyName else {
+            return adding(.bold, to: font)
+        }
+        let descriptor = NSFontDescriptor(fontAttributes: [
+            .family: familyName,
+            .traits: [
+                NSFontDescriptor.TraitKey.weight: weight.rawValue,
+                NSFontDescriptor.TraitKey.symbolic: font.fontDescriptor.symbolicTraits.rawValue,
+            ],
+        ])
+        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 
     private static func adding(_ extra: NSFontDescriptor.SymbolicTraits, to font: NSFont) -> NSFont {
