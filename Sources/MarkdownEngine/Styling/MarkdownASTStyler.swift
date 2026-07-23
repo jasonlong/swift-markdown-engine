@@ -209,6 +209,15 @@ enum MarkdownASTStyler {
             return NSLocationInRange(ctx.caret, syntax) || ctx.caret == NSMaxRange(box)
                 || ctx.selectionIntersects(syntax)
         }()
+        let bulletSyntax = NSRange(
+            location: item.marker.location,
+            length: item.contentRange.location - item.marker.location
+        )
+        let bulletRevealed = item.checkbox == nil && !item.ordered
+            && NSLocationInRange(ctx.caret, bulletSyntax)
+        let showsTaskBullet = item.checkbox != nil
+            && !taskRevealed
+            && ctx.config.taskCheckbox.showsListBullet
         // Hidden task item shares the bullet geometry: `[ ] ` collapses to ~zero
         // advance below, so the hanging indent measures only `- ` and task
         // content aligns with bullet content (the box replaces the bullet slot).
@@ -222,6 +231,13 @@ enum MarkdownASTStyler {
         }
         let markerWidth = (ctx.ns.substring(with: markerGroup) as NSString)
             .size(withAttributes: [.font: ctx.baseFont]).width
+        let markerContentGap = !item.ordered && !taskRevealed && !bulletRevealed
+            ? ctx.config.lists.markerContentGap
+            : 0
+        let taskCheckboxAdvance = showsTaskBullet
+            ? TaskCheckboxGeometry.size(for: ctx.baseFont) + TaskCheckboxGeometry.gap
+            : 0
+        let additionalMarkerAdvance = markerContentGap + taskCheckboxAdvance
         let depthIndent = CGFloat(MarkdownLists.indentLevel(from: ws)) * ctx.config.lists.indentPerLevel
         let ps = NSMutableParagraphStyle()
         let lineHeight = ctx.baseLineHeight + ctx.config.lists.extraLineHeight
@@ -232,13 +248,12 @@ enum MarkdownASTStyler {
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
         ps.defaultTabInterval = ctx.config.lists.indentPerLevel
-        ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
-        // Wrapped lines hang under the first line's content (indent + marker
-        // width). No checkbox-specific extra: the box is a drawn overlay that
-        // doesn't change text advance, so adding it here (and only here, not to
-        // firstLineHeadIndent) shifted an unchecked task's wrapped lines right
-        // of its first line.
-        ps.headIndent = ctx.config.lists.indentPerLevel + depthIndent + markerWidth
+        ps.firstLineHeadIndent = ctx.config.lists.firstLevelIndent
+        // Wrapped lines hang under the first line's content. The source
+        // indentation supplies `depthIndent` on the first line; the paragraph
+        // style supplies the equivalent position to continuation lines.
+        ps.headIndent = ctx.config.lists.firstLevelIndent + depthIndent
+            + markerWidth + additionalMarkerAdvance
         attrs.append((line, [.paragraphStyle: ps]))
 
         // 2. Marker decoration (suppressed while the caret edits the syntax).
@@ -248,7 +263,14 @@ enum MarkdownASTStyler {
             // `- ` keeps full advance (the box's slot, like the bullet `•`);
             // `[ ]` + trailing space collapse to the hidden-marker font so the
             // content starts at the bullet-content x.
-            attrs.append((item.marker, [.foregroundColor: NSColor.clear]))
+            var markerAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: NSColor.clear,
+                .kern: additionalMarkerAdvance,
+            ]
+            if showsTaskBullet {
+                markerAttributes[.bulletMarker] = true
+            }
+            attrs.append((item.marker, markerAttributes))
             if spacer.length > 0 { attrs.append((spacer, [.foregroundColor: NSColor.clear])) }
             attrs.append((box, [.taskCheckbox: item.checked, .foregroundColor: NSColor.clear,
                                 .font: ctx.inlineMarkerFont]))
@@ -264,10 +286,12 @@ enum MarkdownASTStyler {
                 ]))
             }
         } else if !item.ordered {
-            let syntax = NSRange(location: item.marker.location,
-                                 length: item.contentRange.location - item.marker.location)
-            if NSLocationInRange(ctx.caret, syntax) { return }
-            attrs.append((item.marker, [.bulletMarker: true, .foregroundColor: NSColor.clear]))
+            if bulletRevealed { return }
+            attrs.append((item.marker, [
+                .bulletMarker: true,
+                .foregroundColor: NSColor.clear,
+                .kern: additionalMarkerAdvance,
+            ]))
         }
     }
 

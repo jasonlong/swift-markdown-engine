@@ -280,17 +280,45 @@ struct TaskCheckboxGeometryStylerTests {
         return result
     }
 
-    /// Effective headIndent at `pos`: the last styled range covering it that sets `.paragraphStyle`.
-    private func headIndent(in attrs: [StyledRange], at pos: Int) -> CGFloat? {
-        var result: CGFloat?
-        for (range, a) in attrs where NSLocationInRange(pos, range) {
-            if let ps = a[.paragraphStyle] as? NSParagraphStyle { result = ps.headIndent }
+    /// Effective paragraph style at `pos`: the last styled range covering it.
+    private func paragraphStyle(in attrs: [StyledRange], at pos: Int) -> NSParagraphStyle? {
+        var result: NSParagraphStyle?
+        for (range, attributes) in attrs where NSLocationInRange(pos, range) {
+            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+                result = paragraph
+            }
         }
         return result
     }
 
-    private func style(_ text: String, caret: Int = -1) -> [StyledRange] {
-        MarkdownASTStyler.styleAttributes(text: text, fontName: fontName, fontSize: base, caretLocation: caret)
+    private func attribute(
+        _ key: NSAttributedString.Key,
+        in attrs: [StyledRange],
+        at pos: Int
+    ) -> Any? {
+        var result: Any?
+        for (range, attributes) in attrs where NSLocationInRange(pos, range) {
+            if let value = attributes[key] { result = value }
+        }
+        return result
+    }
+
+    private func headIndent(in attrs: [StyledRange], at pos: Int) -> CGFloat? {
+        paragraphStyle(in: attrs, at: pos)?.headIndent
+    }
+
+    private func style(
+        _ text: String,
+        caret: Int = -1,
+        configuration: MarkdownEditorConfiguration = .default
+    ) -> [StyledRange] {
+        MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            caretLocation: caret,
+            configuration: configuration
+        )
     }
 
     @Test("hidden task: [ ] collapses to the hidden font and indent equals a bullet's")
@@ -319,6 +347,26 @@ struct TaskCheckboxGeometryStylerTests {
 
         // [x] hits the identical collapse branch as [ ].
         #expect(headIndent(in: style("- [x] task"), at: 0) == taskIndent)
+    }
+
+    @Test("custom list geometry aligns markers and adds visual spacing")
+    func customListGeometry() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.lists.firstLevelIndent = 0
+        configuration.lists.markerContentGap = 8
+        configuration.taskCheckbox.showsListBullet = true
+
+        let bulletAttributes = style("- bullet", configuration: configuration)
+        #expect(paragraphStyle(in: bulletAttributes, at: 0)?.firstLineHeadIndent == 0)
+        #expect(abs((headIndent(in: bulletAttributes, at: 0) ?? -1) - width("- ") - 8) < 0.01)
+        #expect(attribute(.kern, in: bulletAttributes, at: 0) as? CGFloat == 8)
+
+        let taskAttributes = style("- [ ] task", configuration: configuration)
+        let taskAdvance = 8 + TaskCheckboxGeometry.size(for: baseFont) + TaskCheckboxGeometry.gap
+        #expect(paragraphStyle(in: taskAttributes, at: 0)?.firstLineHeadIndent == 0)
+        #expect(abs((headIndent(in: taskAttributes, at: 0) ?? -1) - width("- ") - taskAdvance) < 0.01)
+        #expect(attribute(.kern, in: taskAttributes, at: 0) as? CGFloat == taskAdvance)
+        #expect(attribute(.bulletMarker, in: taskAttributes, at: 0) as? Bool == true)
     }
 
     @Test("revealed task (caret in syntax): no collapse, indent uses the full raw width")

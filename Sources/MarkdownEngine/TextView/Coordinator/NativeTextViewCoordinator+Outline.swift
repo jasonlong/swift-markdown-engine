@@ -42,7 +42,7 @@ extension NativeTextViewCoordinator {
         let documentID = documentId ?? "__default__"
         loadOutlineState(for: documentID)
         let items = OutlineListModel.items(in: storage.string)
-        let collapsibleItems = items.filter { $0.isBullet && $0.hasChildren }
+        let collapsibleItems = items.filter { hasOutlineMarker($0) && $0.hasChildren }
         let persisted = collapsedOutlineItemsByDocument[documentID] ?? []
         let resolved = resolve(persisted, against: collapsibleItems)
         let canonicalReferences = Set(resolved.map(\.reference))
@@ -67,7 +67,7 @@ extension NativeTextViewCoordinator {
                 value: item.depth,
                 range: item.markerRange
             )
-            if item.isBullet, item.hasChildren {
+            if hasOutlineMarker(item), item.hasChildren {
                 storage.addAttribute(
                     .outlineHasChildren,
                     value: true,
@@ -133,13 +133,15 @@ extension NativeTextViewCoordinator {
     func toggleOutlineItem(at markerLocation: Int, in textView: NativeTextView) -> Bool {
         let items = OutlineListModel.items(in: textView.string)
         guard let item = items.first(where: {
-            $0.markerRange.location == markerLocation && $0.isBullet && $0.hasChildren
+            $0.markerRange.location == markerLocation
+                && hasOutlineMarker($0)
+                && $0.hasChildren
         }) else { return false }
         let documentID = documentId ?? "__default__"
         loadOutlineState(for: documentID)
         let resolved = resolve(
             collapsedOutlineItemsByDocument[documentID] ?? [],
-            against: items.filter { $0.isBullet && $0.hasChildren }
+            against: items.filter { hasOutlineMarker($0) && $0.hasChildren }
         )
         var references = Set(resolved.map(\.reference))
         let isCollapsing: Bool
@@ -174,6 +176,10 @@ extension NativeTextViewCoordinator {
         textView.window?.makeFirstResponder(textView)
         textView.setNeedsDisplay(textView.visibleRect)
         return true
+    }
+
+    private func hasOutlineMarker(_ item: OutlineListItem) -> Bool {
+        item.isBullet || (item.isTask && configuration.taskCheckbox.showsListBullet)
     }
 
     private func resolve(

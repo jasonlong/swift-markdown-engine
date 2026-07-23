@@ -298,8 +298,12 @@ public struct ListStyle: Sendable {
     public var helpersEnabled: Bool
     /// Master switch for auto-closing pairs `()`, `{}`, `[]` while typing.
     public var autoClosePairsEnabled: Bool
+    /// Indent (in points) before a top-level list marker.
+    public var firstLevelIndent: CGFloat
     /// Indent (in points) that one nesting level adds to the list item.
     public var indentPerLevel: CGFloat
+    /// Additional horizontal space after an unordered-list marker.
+    public var markerContentGap: CGFloat
     /// Maximum nesting level reachable by pressing Tab inside a list.
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
@@ -308,13 +312,17 @@ public struct ListStyle: Sendable {
     public init(
         helpersEnabled: Bool = true,
         autoClosePairsEnabled: Bool = true,
+        firstLevelIndent: CGFloat = 27.5,
         indentPerLevel: CGFloat = 27.5,
+        markerContentGap: CGFloat = 0,
         maximumNestingLevel: Int = 3,
         extraLineHeight: CGFloat = 2
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
+        self.firstLevelIndent = firstLevelIndent
         self.indentPerLevel = indentPerLevel
+        self.markerContentGap = markerContentGap
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
     }
@@ -337,13 +345,17 @@ public struct TaskCheckboxStyle: Sendable {
     public var uncheckedSymbolName: String
     /// SF Symbol drawn for a checked task item (`[x]`).
     public var checkedSymbolName: String
+    /// Whether task items retain the unordered-list bullet before the checkbox.
+    public var showsListBullet: Bool
 
     public init(
         uncheckedSymbolName: String = "square",
-        checkedSymbolName: String = "checkmark.square.fill"
+        checkedSymbolName: String = "checkmark.square.fill",
+        showsListBullet: Bool = false
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
         self.checkedSymbolName = checkedSymbolName
+        self.showsListBullet = showsListBullet
     }
 
     public static let `default` = TaskCheckboxStyle()

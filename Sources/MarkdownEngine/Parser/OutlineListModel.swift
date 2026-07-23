@@ -5,6 +5,7 @@ struct OutlineListItem: Equatable {
     let markerRange: NSRange
     let depth: Int
     let isBullet: Bool
+    let isTask: Bool
     let hasChildren: Bool
     let descendantRange: NSRange?
     let reference: OutlineItemReference
@@ -49,6 +50,7 @@ enum OutlineListModel {
                         markerRange: item.marker,
                         depth: depth,
                         isBullet: !item.ordered && item.checkbox == nil,
+                        isTask: !item.ordered && item.checkbox != nil,
                         hasChildren: hasChildren,
                         descendantRange: descendantRange,
                         reference: OutlineItemReference(

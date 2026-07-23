@@ -21,6 +21,39 @@ private final class TestOutlineStateStore: OutlineStateStore, @unchecked Sendabl
 @MainActor
 @Suite("Outline collapse presentation")
 struct OutlineCollapseTests {
+    @Test("task parents collapse when their list bullet is visible")
+    func taskParentCollapses() throws {
+        let text = "- [ ] parent\n\t- child\n"
+        let parent = try #require(OutlineListModel.items(in: text).first)
+        let store = TestOutlineStateStore()
+        store.itemsByDocument["doc"] = [parent.reference]
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.services.outlineState = store
+        configuration.taskCheckbox.showsListBullet = true
+        let coordinator = NativeTextViewCoordinator(
+            text: .constant(text),
+            fontName: "SF Pro",
+            fontSize: 16,
+            isWikiLinkActive: .constant(false),
+            onLinkClick: nil,
+            onInlineSelectionChange: nil
+        )
+        coordinator.documentId = "doc"
+        coordinator.configuration = configuration
+        let textView = NativeTextView(frame: .zero)
+        textView.configuration = configuration
+
+        coordinator.rebuildTextStorageAndStyle(textView, from: text)
+
+        #expect(
+            textView.textStorage?.attribute(
+                .outlineCollapsed,
+                at: parent.markerRange.location,
+                effectiveRange: nil
+            ) as? Bool == true
+        )
+    }
+
     @Test("persisted parents hide descendants without changing source")
     func persistedCollapseIsPresentationOnly() throws {
         let text = "- parent\n\t- child\n- next\n"
