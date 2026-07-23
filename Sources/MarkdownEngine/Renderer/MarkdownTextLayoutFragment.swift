@@ -587,7 +587,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 ?? (self.textLayoutManager?.textContainer?.textView?.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize))
             // A `.bulletMarker` range means the styler painted the raw char
             // `.clear`, so something must ALWAYS be drawn over the slot. Outside
-            // a selection that's the rendered `•`; while the marker sits inside
+            // a selection that's the rendered dot; while the marker sits inside
             // a selection the raw source char (`-`/`*`/`+`) is painted instead,
             // so selecting a list line reveals its raw syntax. (The styler's own
             // reveal is caret-based and doesn't fire for selections — an earlier
