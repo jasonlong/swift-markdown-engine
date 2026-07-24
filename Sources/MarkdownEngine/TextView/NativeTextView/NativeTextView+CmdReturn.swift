@@ -2,20 +2,23 @@
 //  NativeTextView+CmdReturn.swift
 //  MarkdownEngine
 //
-//  ⌘↵ ("link & open") for the inline [[…]] preview. AppKit does NOT route ⌘+Return
-//  through doCommandBy(insertNewline:), so we intercept it as a key equivalent — which
-//  fires first for ⌘-combos — and forward `.confirmAndOpen` to the embedder.
+//  AppKit does not route Command-Return through doCommandBy(insertNewline:),
+//  so command-return behavior is handled as a key equivalent.
 //
 
 import AppKit
 
 extension NativeTextView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           event.keyCode == 36 || event.keyCode == 76,            // Return / keypad Enter
-           let coord = delegate as? NativeTextViewCoordinator,
-           coord.isWikiLinkActive || coord.isImageEmbedActive,
-           let handler = coord.onInlinePreviewKey,
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers == .command,
+              event.keyCode == 36 || event.keyCode == 76 else {
+            return super.performKeyEquivalent(with: event)
+        }
+        if cycleBulletTaskState() { return true }
+        if let coordinator = delegate as? NativeTextViewCoordinator,
+           coordinator.isWikiLinkActive || coordinator.isImageEmbedActive,
+           let handler = coordinator.onInlinePreviewKey,
            handler(.confirmAndOpen) {
             return true
         }
