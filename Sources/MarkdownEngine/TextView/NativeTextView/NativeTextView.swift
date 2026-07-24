@@ -61,6 +61,9 @@ final class NativeTextView: NSTextView {
     /// Click-through ghost-text label shown while the document is empty;
     /// managed by `NativeTextView+Placeholder.swift`.
     weak var placeholderView: PlaceholderLabelView?
+    /// Storage prefix materialized atomically with the first user insertion.
+    /// Focus and caret movement leave it virtual.
+    var emptyDocumentPrefix: String?
 
     // MARK: Cursor exclusion
     /// Embedder-supplied predicate that suppresses the I-beam cursor in edit mode.
@@ -79,6 +82,36 @@ final class NativeTextView: NSTextView {
         // Forward appearance changes to the embedder's highlighter via its registered notification.
         if let name = configuration.services.syntaxHighlighter.appearanceDidChangeNotification {
             NotificationCenter.default.post(name: name, object: self)
+        }
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        guard let prefix = emptyDocumentPrefix,
+              !prefix.isEmpty,
+              string.isEmpty else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+
+        let effectiveRange = replacementRange.location == NSNotFound
+            ? selectedRange()
+            : replacementRange
+        guard effectiveRange.location == 0, effectiveRange.length == 0 else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+
+        if let attributed = insertString as? NSAttributedString, attributed.length > 0 {
+            let prefixed = NSMutableAttributedString(
+                string: prefix,
+                attributes: typingAttributes
+            )
+            prefixed.append(attributed)
+            super.insertText(prefixed, replacementRange: effectiveRange)
+        } else if let inserted = insertString as? String, !inserted.isEmpty {
+            super.insertText(prefix + inserted, replacementRange: effectiveRange)
+        } else {
+            super.insertText(insertString, replacementRange: replacementRange)
         }
     }
 

@@ -13,7 +13,11 @@ extension NativeTextView {
     override func updateInsertionPointStateAndRestartTimer(_ restartFlag: Bool) {
         super.updateInsertionPointStateAndRestartTimer(restartFlag)
         applyBlockImageCaretPolicy()
-        DispatchQueue.main.async { [weak self] in self?.fixPhantomTrailingCaret() }
+        applyVirtualListCaretPolicy()
+        DispatchQueue.main.async { [weak self] in
+            self?.fixPhantomTrailingCaret()
+            self?.applyVirtualListCaretPolicy()
+        }
     }
 
     func applyBlockImageCaretPolicy() {
@@ -75,6 +79,7 @@ extension NativeTextView {
                 guard let self, !self.isApplyingCaretShift else { return }
                 self.applyBlockImageCaretPolicy()
                 self.fixPhantomTrailingCaret()
+                self.applyVirtualListCaretPolicy()
             }
         }
         guard let ts = textStorage, let indicator = observedCaretIndicator,
@@ -102,6 +107,21 @@ extension NativeTextView {
         guard let desiredY, abs(indicator.frame.origin.y - desiredY) >= 0.5 else { return }
         isApplyingCaretShift = true
         indicator.frame.origin.y = desiredY
+        isApplyingCaretShift = false
+    }
+
+    func applyVirtualListCaretPolicy() {
+        guard selectedRange().length == 0,
+              let metrics = virtualListPlaceholderMetrics,
+              let indicator = subviews.first(where: {
+                  type(of: $0) == NSTextInsertionIndicator.self
+              }) else {
+            return
+        }
+        let desiredX = textContainerOrigin.x + metrics.contentX
+        guard abs(indicator.frame.origin.x - desiredX) >= 0.5 else { return }
+        isApplyingCaretShift = true
+        indicator.frame.origin.x = desiredX
         isApplyingCaretShift = false
     }
 }

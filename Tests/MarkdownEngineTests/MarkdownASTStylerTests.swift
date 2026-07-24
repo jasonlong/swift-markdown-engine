@@ -358,6 +358,7 @@ struct TaskCheckboxGeometryStylerTests {
         configuration.taskCheckbox.sizeScale = 1.1
         configuration.taskCheckbox.contentGap = 4
         configuration.taskCheckbox.checkedTextColor = .secondaryLabelColor
+        configuration.taskCheckbox.strikesCheckedText = false
         configuration.taskCheckbox.showsListBullet = true
 
         let bulletAttributes = style("- bullet", configuration: configuration)
@@ -385,6 +386,7 @@ struct TaskCheckboxGeometryStylerTests {
             attribute(.foregroundColor, in: checkedAttributes, at: 6) as? NSColor
                 == .secondaryLabelColor
         )
+        #expect(attribute(.strikethroughStyle, in: checkedAttributes, at: 6) == nil)
     }
 
     @Test("bullet marker stays rendered when the caret reaches its source range")

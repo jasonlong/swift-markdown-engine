@@ -14,7 +14,11 @@ struct BasicEditingRegressionTests {
         let layoutBridge: LayoutBridge
     }
 
-    private func makeEditor(text: String) -> EditorStack {
+    private func makeEditor(
+        text: String,
+        fontName: String = "SF Pro",
+        fontSize: CGFloat = 16
+    ) -> EditorStack {
         _ = NSApplication.shared
         let scrollView = ClampedScrollView(
             frame: NSRect(x: 0, y: 0, width: 600, height: 800)
@@ -25,7 +29,9 @@ struct BasicEditingRegressionTests {
         var configuration = MarkdownEditorConfiguration.default
         configuration.heightBehavior = .fitsContent
         textView.configuration = configuration
-        textView.baseFont = .systemFont(ofSize: 16)
+        textView.baseFont =
+            NSFont(name: fontName, size: fontSize)
+            ?? .systemFont(ofSize: fontSize)
         textView.font = textView.baseFont
         textView.isEditable = true
         textView.isSelectable = true
@@ -35,8 +41,8 @@ struct BasicEditingRegressionTests {
 
         let coordinator = NativeTextViewCoordinator(
             text: .constant(text),
-            fontName: "SF Pro",
-            fontSize: 16,
+            fontName: fontName,
+            fontSize: fontSize,
             isWikiLinkActive: .constant(false),
             onLinkClick: nil,
             onInlineSelectionChange: nil
@@ -132,5 +138,92 @@ struct BasicEditingRegressionTests {
         #expect(stack.textView.string == "first\n")
         #expect(after > before)
         #expect(stack.textView.frame.height == after)
+    }
+
+    @Test(
+        "An empty-document prefix stays virtual until the first insertion",
+        arguments: ["Geist-Regular", "Geist-Light", "SF Pro"]
+    )
+    func emptyDocumentPrefixMaterializesOnFirstEdit(fontName: String) throws {
+        let stack = makeEditor(text: "", fontName: fontName, fontSize: 15)
+        stack.textView.emptyDocumentPrefix = "- "
+        stack.textView.setPlaceholder(nil)
+        stack.textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        #expect(stack.textView.string.isEmpty)
+        #expect(stack.textView.placeholderView != nil)
+        let metrics = try #require(stack.textView.virtualListPlaceholderMetrics)
+        let font = stack.textView.baseFont
+        let expectedContentX =
+            (stack.textView.textContainer?.lineFragmentPadding ?? 0)
+            + stack.textView.configuration.lists.firstLevelIndent
+            + ("- " as NSString).size(withAttributes: [.font: font]).width
+            + stack.textView.configuration.lists.markerContentGap
+        #expect(metrics.contentX == expectedContentX)
+        #expect(metrics.dotDiameter == BulletMarkerGeometry.dotDiameter(for: font))
+        let expectedBaseline = BulletMarkerGeometry.listBaselineY(
+            for: font,
+            extraLineHeight: stack.textView.configuration.lists.extraLineHeight
+        )
+        #expect(
+            metrics.bulletCenter.y
+                == BulletMarkerGeometry.centerY(
+                    forBaseline: expectedBaseline,
+                    font: font
+                )
+        )
+        let virtualCenter = metrics.bulletCenter
+
+        stack.textView.insertText(
+            "First item",
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+
+        #expect(stack.textView.string == "- First item")
+        #expect(stack.textView.selectedRange() == NSRange(location: 12, length: 0))
+
+        let textLayoutManager = try #require(stack.textView.textLayoutManager)
+        let contentStorage = try #require(
+            textLayoutManager.textContentManager as? NSTextContentStorage
+        )
+        var renderedCenter: CGPoint?
+        textLayoutManager.enumerateTextLayoutFragments(
+            from: textLayoutManager.documentRange.location,
+            options: [.ensuresLayout]
+        ) { fragment in
+            let fragmentStart = contentStorage.offset(
+                from: contentStorage.documentRange.location,
+                to: fragment.rangeInElement.location
+            )
+            guard fragmentStart == 0, let line = fragment.textLineFragments.first else {
+                return true
+            }
+            let markerPosition = line.locationForCharacter(at: 0)
+            let lineBounds = line.typographicBounds
+            let baselineY =
+                fragment.layoutFragmentFrame.minY
+                + lineBounds.minY
+                + markerPosition.y
+            let markerWidth = ("-" as NSString).size(
+                withAttributes: [.font: font]
+            ).width
+            renderedCenter = CGPoint(
+                x: fragment.layoutFragmentFrame.minX
+                    + lineBounds.minX
+                    + markerPosition.x
+                    + markerWidth / 2,
+                y: BulletMarkerGeometry.centerY(
+                    forBaseline: baselineY,
+                    font: font
+                )
+            )
+            return false
+        }
+        let resolvedRenderedCenter = try #require(renderedCenter)
+        #expect(
+            abs(resolvedRenderedCenter.y - virtualCenter.y) < 0.01,
+            "Rendered \(resolvedRenderedCenter.y), virtual \(virtualCenter.y)"
+        )
+        #expect(abs(resolvedRenderedCenter.x - virtualCenter.x) < 0.01)
     }
 }

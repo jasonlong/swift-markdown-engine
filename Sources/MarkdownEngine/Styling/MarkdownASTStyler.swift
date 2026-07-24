@@ -270,11 +270,12 @@ enum MarkdownASTStyler {
                 attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
             }
             if item.checked, NSMaxRange(item.range) > NSMaxRange(box) {
-                var checkedAttributes: [NSAttributedString.Key: Any] = [
-                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                    .strikethroughColor: ctx.config.taskCheckbox.checkedTextColor
-                        ?? ctx.theme.strikethroughColor,
-                ]
+                var checkedAttributes: [NSAttributedString.Key: Any] = [:]
+                if ctx.config.taskCheckbox.strikesCheckedText {
+                    checkedAttributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+                    checkedAttributes[.strikethroughColor] =
+                        ctx.config.taskCheckbox.checkedTextColor ?? ctx.theme.strikethroughColor
+                }
                 if let checkedTextColor = ctx.config.taskCheckbox.checkedTextColor {
                     checkedAttributes[.foregroundColor] = checkedTextColor
                 }

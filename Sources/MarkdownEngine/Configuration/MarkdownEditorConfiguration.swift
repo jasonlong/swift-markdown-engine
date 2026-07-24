@@ -359,6 +359,8 @@ public struct TaskCheckboxStyle: Sendable {
     public var checkedTint: NSColor?
     /// Optional foreground color for checked task text.
     public var checkedTextColor: NSColor?
+    /// Whether checked task text is drawn with a strikethrough.
+    public var strikesCheckedText: Bool
     /// Whether task items retain the unordered-list bullet before the checkbox.
     public var showsListBullet: Bool
 
@@ -370,6 +372,7 @@ public struct TaskCheckboxStyle: Sendable {
         contentGap: CGFloat = 2,
         checkedTint: NSColor? = nil,
         checkedTextColor: NSColor? = nil,
+        strikesCheckedText: Bool = true,
         showsListBullet: Bool = false
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
@@ -379,6 +382,7 @@ public struct TaskCheckboxStyle: Sendable {
         self.contentGap = contentGap
         self.checkedTint = checkedTint
         self.checkedTextColor = checkedTextColor
+        self.strikesCheckedText = strikesCheckedText
         self.showsListBullet = showsListBullet
     }
 

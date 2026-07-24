@@ -615,9 +615,12 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
             let center = CGPoint(
                 x: pos.x + markerWidth / 2,
-                y: pos.baselineY - font.xHeight / 2
+                y: BulletMarkerGeometry.centerY(
+                    forBaseline: pos.baselineY,
+                    font: font
+                )
             )
-            let dotDiameter = max(4.5, min(6, font.pointSize * 0.34))
+            let dotDiameter = BulletMarkerGeometry.dotDiameter(for: font)
             let isCollapsed = (ts.attribute(
                 .outlineCollapsed,
                 at: attrRange.location,

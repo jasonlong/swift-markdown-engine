@@ -104,6 +104,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// the first typed character hides it. Lives inside the scrolled content, so
     /// it sits below the header band and tracks its expand/collapse animation.
     public var placeholder: NSAttributedString?
+    /// Storage prefix inserted atomically with the first user insertion while
+    /// the document is empty. It remains virtual through focus and caret moves.
+    public var emptyDocumentPrefix: String?
 
     /// SwiftUI header hosted above the body and scrolling with it. The engine owns
     /// an `NSHostingView`, reserves its (intrinsic) height at the top of the text
@@ -146,6 +149,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
         placeholder: NSAttributedString? = nil,
+        emptyDocumentPrefix: String? = nil,
         header: AnyView? = nil,
         headerCollapsedHeight: CGFloat = 0,
         headerExpanded: Bool = true,
@@ -169,6 +173,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
         self.placeholder = placeholder
+        self.emptyDocumentPrefix = emptyDocumentPrefix
         self.header = header
         self.headerCollapsedHeight = headerCollapsedHeight
         self.headerExpanded = headerExpanded
@@ -271,6 +276,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
+        textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
             textView.writingToolsBehavior = .complete
         }
@@ -423,6 +429,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
 
         textView.onPasteImage = onPasteImage
         textView.isCursorExcluded = isCursorExcluded
+        textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)
         // Sync heightBehavior across all three layers (scroll view, text view,
         // coordinator) so a runtime switch fully reconfigures.

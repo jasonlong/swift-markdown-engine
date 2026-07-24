@@ -15,6 +15,8 @@ import AppKit
 /// container origin. A plain NSView — overriding `draw(_:)` here is safe
 /// (unlike on the TextKit-2 backed `NativeTextView` itself).
 final class PlaceholderLabelView: NSView {
+    weak var textView: NativeTextView?
+
     var attributedText: NSAttributedString? {
         didSet { needsDisplay = true }
     }
@@ -26,31 +28,91 @@ final class PlaceholderLabelView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
+        if let textView,
+           let metrics = textView.virtualListPlaceholderMetrics {
+            textView.configuration.theme.mutedText.setFill()
+            NSBezierPath(
+                ovalIn: CGRect(
+                    x: metrics.bulletCenter.x - metrics.dotDiameter / 2,
+                    y: metrics.bulletCenter.y - metrics.dotDiameter / 2,
+                    width: metrics.dotDiameter,
+                    height: metrics.dotDiameter
+                )
+            ).fill()
+            return
+        }
         attributedText?.draw(
             with: bounds,
             options: [.usesLineFragmentOrigin, .usesFontLeading]
         )
     }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+}
+
+struct VirtualListPlaceholderMetrics {
+    let bulletCenter: CGPoint
+    let dotDiameter: CGFloat
+    let contentX: CGFloat
 }
 
 extension NativeTextView {
+    var virtualListPlaceholderMetrics: VirtualListPlaceholderMetrics? {
+        guard (textStorage?.length ?? 0) == 0,
+              let prefix = emptyDocumentPrefix,
+              ["- ", "* ", "+ "].contains(prefix) else {
+            return nil
+        }
+
+        let font = baseFont
+        let marker = String(prefix.prefix(1))
+        let markerWidth = (marker as NSString).size(withAttributes: [.font: font]).width
+        let prefixWidth = (prefix as NSString).size(withAttributes: [.font: font]).width
+        let baselineY = BulletMarkerGeometry.listBaselineY(
+            for: font,
+            extraLineHeight: configuration.lists.extraLineHeight
+        )
+        let textPadding = textContainer?.lineFragmentPadding ?? 0
+        let markerX = textPadding + configuration.lists.firstLevelIndent
+
+        return VirtualListPlaceholderMetrics(
+            bulletCenter: CGPoint(
+                x: markerX + markerWidth / 2,
+                y: BulletMarkerGeometry.centerY(
+                    forBaseline: baselineY,
+                    font: font
+                )
+            ),
+            dotDiameter: BulletMarkerGeometry.dotDiameter(for: font),
+            contentX: markerX + prefixWidth + configuration.lists.markerContentGap
+        )
+    }
+
     /// Install, refresh, or remove the placeholder. Cheap when nothing changed —
     /// called from every `updateNSView`.
     func setPlaceholder(_ attributed: NSAttributedString?) {
-        if let attributed {
+        if attributed != nil || virtualListPlaceholderMetrics != nil {
             let view: PlaceholderLabelView
             if let existing = placeholderView {
                 view = existing
-                if existing.attributedText?.isEqual(to: attributed) != true {
-                    existing.attributedText = attributed
-                }
             } else {
                 view = PlaceholderLabelView()
-                view.attributedText = attributed
                 view.autoresizingMask = [.width, .height]
                 addSubview(view)
                 placeholderView = view
             }
+            view.textView = self
+            if let attributed {
+                if view.attributedText?.isEqual(to: attributed) != true {
+                    view.attributedText = attributed
+                }
+            } else if view.attributedText != nil {
+                view.attributedText = nil
+            }
+            view.needsDisplay = true
             let target = placeholderFrame()
             if !view.frame.isApproximatelyEqual(to: target) {
                 view.frame = target
@@ -67,6 +129,9 @@ extension NativeTextView {
         // after the editor is rebuilt (e.g. graph view and back).
         if let placeholderView, !placeholderView.isHidden {
             applyManagedFrameSize(width: frame.width)
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.applyVirtualListCaretPolicy()
         }
     }
 
