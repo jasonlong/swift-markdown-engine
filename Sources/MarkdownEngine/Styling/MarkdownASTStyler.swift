@@ -221,7 +221,7 @@ enum MarkdownASTStyler {
             ? TaskCheckboxGeometry.size(
                 for: ctx.baseFont,
                 scale: ctx.config.taskCheckbox.sizeScale
-            ) + TaskCheckboxGeometry.gap
+            ) + ctx.config.taskCheckbox.contentGap
             : 0
         let additionalMarkerAdvance = markerContentGap + taskCheckboxAdvance
         let depthIndent = CGFloat(MarkdownLists.indentLevel(from: ws)) * ctx.config.lists.indentPerLevel

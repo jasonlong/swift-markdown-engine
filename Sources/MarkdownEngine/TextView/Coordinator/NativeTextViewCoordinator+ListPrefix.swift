@@ -1,6 +1,41 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
+    /// Backspace from the first visible character of a rendered list item should
+    /// behave like ordinary line-start Backspace: remove the presentation-only
+    /// prefix and join the content to the previous line. On the document's first
+    /// line, the same gesture simply converts the item to a paragraph.
+    func handleBackspaceAtProtectedListStart(_ textView: NSTextView) -> Bool {
+        let selection = textView.selectedRange()
+        guard selection.length == 0, selection.location > 0,
+              let protectedRange = MarkdownStyler.listProtectedRange(
+                at: selection.location - 1,
+                in: textView.string
+              ),
+              NSMaxRange(protectedRange) == selection.location else {
+            return false
+        }
+
+        let nsText = textView.string as NSString
+        let originalLength = nsText.length
+        let joinsPreviousLine = protectedRange.location > 0
+            && nsText.character(at: protectedRange.location - 1) == 0x0A
+        let removalStart = joinsPreviousLine
+            ? protectedRange.location - 1
+            : protectedRange.location
+        let removalRange = NSRange(
+            location: removalStart,
+            length: selection.location - removalStart
+        )
+
+        MarkdownLists.performEdit(textView, replace: removalRange, with: "")
+        guard (textView.string as NSString).length == originalLength - removalRange.length else {
+            return false
+        }
+        textView.setSelectedRange(NSRange(location: removalStart, length: 0))
+        return true
+    }
+
     func redirectSelectionFromProtectedListPrefix(in textView: NSTextView) -> Bool {
         guard !isAdjustingListSelection else { return false }
         let selection = textView.selectedRange()
@@ -57,9 +92,11 @@ extension NativeTextViewCoordinator {
             let lineRange = nsText.lineRange(
                 for: NSRange(location: protectedRange.location, length: 0)
             )
+            let removesWholePrefix = affectedRange.location <= protectedRange.location
+                && NSMaxRange(affectedRange) >= NSMaxRange(protectedRange)
             let removesWholeLine = affectedRange.location <= lineRange.location
                 && NSMaxRange(affectedRange) >= NSMaxRange(lineRange)
-            if !removesWholeLine { return true }
+            if !removesWholePrefix && !removesWholeLine { return true }
         }
         return false
     }

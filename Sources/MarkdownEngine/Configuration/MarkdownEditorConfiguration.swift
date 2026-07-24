@@ -353,6 +353,8 @@ public struct TaskCheckboxStyle: Sendable {
     public var usesNativeSymbolRendering: Bool
     /// Multiplier applied to the checkbox symbol's natural editor size.
     public var sizeScale: CGFloat
+    /// Gap between the checkbox symbol's right edge and the task text.
+    public var contentGap: CGFloat
     /// Optional fill tint for a checked symbol.
     public var checkedTint: NSColor?
     /// Optional foreground color for checked task text.
@@ -365,6 +367,7 @@ public struct TaskCheckboxStyle: Sendable {
         checkedSymbolName: String = "checkmark.square.fill",
         usesNativeSymbolRendering: Bool = false,
         sizeScale: CGFloat = 1,
+        contentGap: CGFloat = 2,
         checkedTint: NSColor? = nil,
         checkedTextColor: NSColor? = nil,
         showsListBullet: Bool = false
@@ -373,6 +376,7 @@ public struct TaskCheckboxStyle: Sendable {
         self.checkedSymbolName = checkedSymbolName
         self.usesNativeSymbolRendering = usesNativeSymbolRendering
         self.sizeScale = sizeScale
+        self.contentGap = contentGap
         self.checkedTint = checkedTint
         self.checkedTextColor = checkedTextColor
         self.showsListBullet = showsListBullet

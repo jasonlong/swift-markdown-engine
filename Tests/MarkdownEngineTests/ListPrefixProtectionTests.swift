@@ -90,5 +90,10 @@ struct ListPrefixProtectionTests {
             replacement: "I",
             in: bulletText
         ))
+        #expect(!bulletCoordinator.editTouchesProtectedListPrefix(
+            affectedRange: NSRange(location: 5, length: 5),
+            replacement: "",
+            in: bulletText
+        ))
     }
 }

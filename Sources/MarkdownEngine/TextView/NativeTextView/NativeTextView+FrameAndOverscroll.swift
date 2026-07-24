@@ -184,7 +184,15 @@ extension NativeTextView {
             }
         }
 
-        return max(ceil(rawHeight + (textContainerInset.height * 2)), minimumContentHeight)
+        // TextKit's typographic bounds can land exactly on the view boundary,
+        // while glyph antialiasing and the insertion indicator extend slightly
+        // below it. Keep a small bottom guard so a freshly inserted final line
+        // never appears clipped in fit-to-content hosts.
+        let bottomRenderingGuard: CGFloat = 2
+        return max(
+            ceil(rawHeight + (textContainerInset.height * 2) + bottomRenderingGuard),
+            minimumContentHeight
+        )
     }
 
     /// Fixed reading-column width = wrap width + horizontal insets on both sides.

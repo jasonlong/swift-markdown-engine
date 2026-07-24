@@ -356,6 +356,7 @@ struct TaskCheckboxGeometryStylerTests {
         configuration.lists.indentPerLevel = 32
         configuration.lists.markerContentGap = 8
         configuration.taskCheckbox.sizeScale = 1.1
+        configuration.taskCheckbox.contentGap = 4
         configuration.taskCheckbox.checkedTextColor = .secondaryLabelColor
         configuration.taskCheckbox.showsListBullet = true
 
@@ -373,7 +374,7 @@ struct TaskCheckboxGeometryStylerTests {
 
         let taskAttributes = style("- [ ] task", configuration: configuration)
         let taskAdvance = 8 + TaskCheckboxGeometry.size(for: baseFont, scale: 1.1)
-            + TaskCheckboxGeometry.gap
+            + configuration.taskCheckbox.contentGap
         #expect(paragraphStyle(in: taskAttributes, at: 0)?.firstLineHeadIndent == 0)
         #expect(abs((headIndent(in: taskAttributes, at: 0) ?? -1) - width("- ") - taskAdvance) < 0.01)
         #expect(attribute(.kern, in: taskAttributes, at: 0) as? CGFloat == taskAdvance)

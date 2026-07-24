@@ -720,6 +720,10 @@ extension NativeTextViewCoordinator {
     public func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         // Raw mode: default key handling (no ⇧⇥ outdent, no preview routing).
         if configuration.rawSourceMode { return false }
+        if commandSelector == #selector(NSResponder.deleteBackward(_:)),
+           handleBackspaceAtProtectedListStart(textView) {
+            return true
+        }
         if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
             return handleBacktab(textView)
         }
