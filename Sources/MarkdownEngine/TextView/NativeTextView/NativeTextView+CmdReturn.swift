@@ -9,12 +9,18 @@
 import AppKit
 
 extension NativeTextView {
+    override func keyDown(with event: NSEvent) {
+        if handleCommandReturn(event) { return }
+        super.keyDown(with: event)
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard modifiers == .command,
-              event.keyCode == 36 || event.keyCode == 76 else {
-            return super.performKeyEquivalent(with: event)
-        }
+        if handleCommandReturn(event) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    private func handleCommandReturn(_ event: NSEvent) -> Bool {
+        guard isCommandReturn(event) else { return false }
         if cycleBulletTaskState() { return true }
         if let coordinator = delegate as? NativeTextViewCoordinator,
            coordinator.isWikiLinkActive || coordinator.isImageEmbedActive,
@@ -22,6 +28,14 @@ extension NativeTextView {
            handler(.confirmAndOpen) {
             return true
         }
-        return super.performKeyEquivalent(with: event)
+        return false
+    }
+
+    private func isCommandReturn(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let ignoredModifiers: NSEvent.ModifierFlags = [.capsLock, .numericPad, .function]
+        let shortcutModifiers = modifiers.subtracting(ignoredModifiers)
+        return shortcutModifiers == .command
+            && (event.keyCode == 36 || event.keyCode == 76)
     }
 }

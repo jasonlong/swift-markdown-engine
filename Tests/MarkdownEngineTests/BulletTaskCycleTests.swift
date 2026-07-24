@@ -79,6 +79,57 @@ struct BulletTaskCycleTests {
         #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
     }
 
+    @Test("window event dispatch cycles the focused bullet")
+    func windowDispatchCyclesFocusedBullet() {
+        _ = NSApplication.shared
+        let textView = NativeTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        textView.string = "+ item"
+        let coordinator = makeCoordinator(text: textView.string)
+        textView.delegate = coordinator
+        textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = textView
+        #expect(window.makeFirstResponder(textView))
+
+        let commandReturn = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: .command,
+            timestamp: 0,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: "\r",
+            charactersIgnoringModifiers: "\r",
+            isARepeat: false,
+            keyCode: 36
+        )
+        guard let commandReturn else {
+            Issue.record("Could not create Command-Return key event")
+            return
+        }
+
+        window.sendEvent(commandReturn)
+
+        #expect(textView.string == "+ [ ] item")
+        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
+
+        window.sendEvent(commandReturn)
+
+        #expect(textView.string == "+ [x] item")
+        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
+
+        window.sendEvent(commandReturn)
+
+        #expect(textView.string == "+ item")
+        #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
+    }
+
     @Test("non-bullet lines and ordered lists are unchanged")
     func ignoresOtherLines() {
         #expect(BulletTaskCycle.edit(in: "plain text", at: 3) == nil)
