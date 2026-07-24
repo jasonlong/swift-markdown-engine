@@ -1,6 +1,10 @@
 import AppKit
 
 extension NativeTextView {
+    @objc func cycleBulletTaskState(_ sender: Any?) {
+        _ = cycleBulletTaskState()
+    }
+
     func cycleBulletTaskState() -> Bool {
         guard isEditable,
               let textStorage,

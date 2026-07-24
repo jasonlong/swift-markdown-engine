@@ -79,8 +79,8 @@ struct BulletTaskCycleTests {
         #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
     }
 
-    @Test("window event dispatch cycles the focused bullet")
-    func windowDispatchCyclesFocusedBullet() {
+    @Test("application command dispatch cycles the focused bullet")
+    func applicationCommandDispatchCyclesFocusedBullet() {
         _ = NSApplication.shared
         let textView = NativeTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
         textView.string = "+ item"
@@ -95,6 +95,27 @@ struct BulletTaskCycleTests {
             defer: false
         )
         window.contentView = textView
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        let previousMainMenu = NSApp.mainMenu
+        let mainMenu = NSMenu()
+        let editorMenuItem = NSMenuItem()
+        let editorMenu = NSMenu(title: "Editor")
+        let cycleItem = NSMenuItem(
+            title: "Cycle Bullet / Task State",
+            action: NSSelectorFromString("cycleBulletTaskState:"),
+            keyEquivalent: "\r"
+        )
+        cycleItem.target = textView
+        cycleItem.keyEquivalentModifierMask = .command
+        editorMenu.addItem(cycleItem)
+        editorMenuItem.submenu = editorMenu
+        mainMenu.addItem(editorMenuItem)
+        NSApp.mainMenu = mainMenu
+        defer {
+            NSApp.mainMenu = previousMainMenu
+            window.close()
+        }
         #expect(window.makeFirstResponder(textView))
 
         let commandReturn = NSEvent.keyEvent(
@@ -114,17 +135,17 @@ struct BulletTaskCycleTests {
             return
         }
 
-        window.sendEvent(commandReturn)
+        NSApp.sendEvent(commandReturn)
 
         #expect(textView.string == "+ [ ] item")
         #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
 
-        window.sendEvent(commandReturn)
+        NSApp.sendEvent(commandReturn)
 
         #expect(textView.string == "+ [x] item")
         #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
 
-        window.sendEvent(commandReturn)
+        NSApp.sendEvent(commandReturn)
 
         #expect(textView.string == "+ item")
         #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
