@@ -50,6 +50,33 @@ struct BulletTaskCycleTests {
         textView.delegate = coordinator
         textView.setSelectedRange(NSRange(location: 6, length: 0))
 
+        #expect(textView.cycleBulletTaskState())
+        #expect(textView.string == "- [ ] item")
+        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
+
+        #expect(textView.cycleBulletTaskState())
+        #expect(textView.string == "- [x] item")
+        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
+
+        #expect(textView.cycleBulletTaskState())
+        #expect(textView.string == "- item")
+        #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
+    }
+
+    @Test("only the focused editor handles command-return")
+    func onlyFocusedEditorHandlesCommandReturn() {
+        let backgroundEditor = NativeTextView(frame: .zero)
+        backgroundEditor.string = "- [x] background"
+        let backgroundCoordinator = makeCoordinator(text: backgroundEditor.string)
+        backgroundEditor.delegate = backgroundCoordinator
+        backgroundEditor.setSelectedRange(NSRange(location: 16, length: 0))
+
+        let focusedEditor = NativeTextView(frame: .zero)
+        focusedEditor.string = "+ focused"
+        let focusedCoordinator = makeCoordinator(text: focusedEditor.string)
+        focusedEditor.delegate = focusedCoordinator
+        focusedEditor.setSelectedRange(NSRange(location: 9, length: 0))
+
         let commandReturn = NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -66,89 +93,25 @@ struct BulletTaskCycleTests {
             Issue.record("Could not create Command-Return key event")
             return
         }
-        #expect(textView.performKeyEquivalent(with: commandReturn))
-        #expect(textView.string == "- [ ] item")
-        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
 
-        #expect(textView.cycleBulletTaskState())
-        #expect(textView.string == "- [x] item")
-        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
-
-        #expect(textView.cycleBulletTaskState())
-        #expect(textView.string == "- item")
-        #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
-    }
-
-    @Test("application command dispatch cycles the focused bullet")
-    func applicationCommandDispatchCyclesFocusedBullet() {
-        _ = NSApplication.shared
-        let textView = NativeTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
-        textView.string = "+ item"
-        let coordinator = makeCoordinator(text: textView.string)
-        textView.delegate = coordinator
-        textView.setSelectedRange(NSRange(location: 6, length: 0))
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
+        #expect(
+            !backgroundEditor.handleCommandReturnKeyEquivalent(
+                commandReturn,
+                firstResponder: focusedEditor
+            )
         )
-        window.contentView = textView
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        let previousMainMenu = NSApp.mainMenu
-        let mainMenu = NSMenu()
-        let editorMenuItem = NSMenuItem()
-        let editorMenu = NSMenu(title: "Editor")
-        let cycleItem = NSMenuItem(
-            title: "Cycle Bullet / Task State",
-            action: NSSelectorFromString("cycleBulletTaskState:"),
-            keyEquivalent: "\r"
+        #expect(backgroundEditor.string == "- [x] background")
+
+        #expect(
+            focusedEditor.handleCommandReturnKeyEquivalent(
+                commandReturn,
+                firstResponder: focusedEditor
+            )
         )
-        cycleItem.target = textView
-        cycleItem.keyEquivalentModifierMask = .command
-        editorMenu.addItem(cycleItem)
-        editorMenuItem.submenu = editorMenu
-        mainMenu.addItem(editorMenuItem)
-        NSApp.mainMenu = mainMenu
-        defer {
-            NSApp.mainMenu = previousMainMenu
-            window.close()
-        }
-        #expect(window.makeFirstResponder(textView))
 
-        let commandReturn = NSEvent.keyEvent(
-            with: .keyDown,
-            location: .zero,
-            modifierFlags: .command,
-            timestamp: 0,
-            windowNumber: window.windowNumber,
-            context: nil,
-            characters: "\r",
-            charactersIgnoringModifiers: "\r",
-            isARepeat: false,
-            keyCode: 36
-        )
-        guard let commandReturn else {
-            Issue.record("Could not create Command-Return key event")
-            return
-        }
-
-        NSApp.sendEvent(commandReturn)
-
-        #expect(textView.string == "+ [ ] item")
-        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
-
-        NSApp.sendEvent(commandReturn)
-
-        #expect(textView.string == "+ [x] item")
-        #expect(textView.selectedRange() == NSRange(location: 10, length: 0))
-
-        NSApp.sendEvent(commandReturn)
-
-        #expect(textView.string == "+ item")
-        #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
+        #expect(backgroundEditor.string == "- [x] background")
+        #expect(focusedEditor.string == "+ [ ] focused")
+        #expect(focusedEditor.selectedRange() == NSRange(location: 13, length: 0))
     }
 
     @Test("non-bullet lines and ordered lists are unchanged")

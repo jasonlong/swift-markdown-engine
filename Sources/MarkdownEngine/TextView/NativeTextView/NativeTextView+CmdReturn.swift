@@ -15,8 +15,23 @@ extension NativeTextView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if handleCommandReturn(event) { return true }
+        if handleFocusedCommandReturnKeyEquivalent(event) { return true }
         return super.performKeyEquivalent(with: event)
+    }
+
+    func handleFocusedCommandReturnKeyEquivalent(_ event: NSEvent) -> Bool {
+        handleCommandReturnKeyEquivalent(
+            event,
+            firstResponder: window?.firstResponder
+        )
+    }
+
+    func handleCommandReturnKeyEquivalent(
+        _ event: NSEvent,
+        firstResponder: NSResponder?
+    ) -> Bool {
+        guard firstResponder === self else { return false }
+        return handleCommandReturn(event)
     }
 
     private func handleCommandReturn(_ event: NSEvent) -> Bool {
