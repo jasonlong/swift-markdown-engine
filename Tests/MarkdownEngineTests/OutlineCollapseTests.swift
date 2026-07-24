@@ -95,4 +95,69 @@ struct OutlineCollapseTests {
             ) as? Bool == true
         )
     }
+
+    @Test("loose nested lists remain one collapsible outline")
+    func looseNestedListsCollapseTogether() throws {
+        let text = """
+            + parent
+              - section
+
+                - [ ] first
+
+                - [ ] second
+
+              - sibling
+            - next
+            """
+        let outlineItems = OutlineListModel.items(in: text)
+        let parent = try #require(outlineItems.first)
+        let section = try #require(outlineItems.dropFirst().first)
+        let firstTask = try #require(outlineItems.dropFirst(2).first)
+        let sibling = try #require(outlineItems.dropFirst(4).first)
+
+        #expect(parent.hasChildren)
+        #expect(section.hasChildren)
+        #expect(parent.descendantRange.map {
+            NSLocationInRange(firstTask.markerRange.location, $0)
+                && NSLocationInRange(sibling.markerRange.location, $0)
+        } == true)
+        #expect(section.descendantRange.map {
+            NSLocationInRange(firstTask.markerRange.location, $0)
+                && !NSLocationInRange(sibling.markerRange.location, $0)
+        } == true)
+
+        let store = TestOutlineStateStore()
+        store.itemsByDocument["doc"] = [parent.reference]
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.services.outlineState = store
+        let coordinator = NativeTextViewCoordinator(
+            text: .constant(text),
+            fontName: "SF Pro",
+            fontSize: 16,
+            isWikiLinkActive: .constant(false),
+            onLinkClick: nil,
+            onInlineSelectionChange: nil
+        )
+        coordinator.documentId = "doc"
+        coordinator.configuration = configuration
+        let textView = NativeTextView(frame: .zero)
+        textView.configuration = configuration
+
+        coordinator.rebuildTextStorageAndStyle(textView, from: text)
+
+        #expect(
+            textView.textStorage?.attribute(
+                .outlineHidden,
+                at: firstTask.markerRange.location,
+                effectiveRange: nil
+            ) as? Bool == true
+        )
+        #expect(
+            textView.textStorage?.attribute(
+                .outlineHidden,
+                at: sibling.markerRange.location,
+                effectiveRange: nil
+            ) as? Bool == true
+        )
+    }
 }

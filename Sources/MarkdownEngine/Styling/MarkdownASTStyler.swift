@@ -51,6 +51,21 @@ enum MarkdownASTStyler {
         codePara.tailIndent = -configuration.codeBlock.horizontalIndent
         codePara.minimumLineHeight = codeLineHeight
         codePara.maximumLineHeight = codeLineHeight
+        let parsedBlocks = precomputedBlocks
+            ?? BlockParser.parse(text, registry: configuration.extensionRegistry)
+        let nestedListBlankLocations: Set<Int>
+        if configuration.lists.nestedBlankLineHeightScale == 1 {
+            nestedListBlankLocations = []
+        } else {
+            let outlineItems = OutlineListModel.items(
+                in: text,
+                precomputedBlocks: parsedBlocks
+            )
+            nestedListBlankLocations = OutlineListModel.nestedBlankLineLocations(
+                in: parsedBlocks,
+                outlineItems: outlineItems
+            )
+        }
         let ctx = Ctx(
             ns: ns,
             fontName: fontName,
@@ -66,9 +81,10 @@ enum MarkdownASTStyler {
             config: configuration,
             extensionsByID: configuration.extensionsByID,
             wikiLinkID: wikiLinkIDProvider,
-            scopedRanges: scopedRanges
+            scopedRanges: scopedRanges,
+            nestedListBlankLocations: nestedListBlankLocations
         )
-        let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: precomputedBlocks,
+        let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: parsedBlocks,
                                        registry: configuration.extensionRegistry)
         var attrs: [StyledRange] = []
         for block in blocks where ctx.inScope(block.range) {
@@ -353,6 +369,7 @@ enum MarkdownASTStyler {
         let extensionsByID: [String: any MarkdownExtension]
         let wikiLinkID: (NSRange) -> String?
         let scopedRanges: [NSRange]?
+        let nestedListBlankLocations: Set<Int>
 
         /// True when a non-empty selection overlaps `range` — the selection
         /// counterpart of `isActive` for elements that reveal on select.
@@ -429,7 +446,9 @@ enum MarkdownASTStyler {
     }
 
     private static func styleBlankLine(range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]) {
-        let scale = ctx.config.paragraph.blankLineHeightScale
+        let scale = ctx.nestedListBlankLocations.contains(range.location)
+            ? ctx.config.lists.nestedBlankLineHeightScale
+            : ctx.config.paragraph.blankLineHeightScale
         guard scale != 1 else { return }
         let lineHeight = max(
             1,

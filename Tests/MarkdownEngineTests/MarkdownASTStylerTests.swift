@@ -140,6 +140,40 @@ struct MarkdownASTStylerTests {
         #expect(blankLineStyle?.paragraphSpacing == 0)
     }
 
+    @Test("nested loose-list blank lines can be compacted independently")
+    func nestedLooseListBlankLineHeight() {
+        let text = "intro\n\n- parent\n\n  - first\n\n  - second"
+        let ns = text as NSString
+        let proseBlank = ns.range(of: "\n\n").location + 1
+        let nestedBlank = ns.range(
+            of: "\n\n",
+            options: [],
+            range: NSRange(
+                location: proseBlank + 1,
+                length: ns.length - proseBlank - 1
+            )
+        ).location + 1
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.lists.nestedBlankLineHeightScale = 0.05
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let proseStyle = attrs.reversed().first { entry in
+            NSLocationInRange(proseBlank, entry.range)
+                && entry.attributes[.paragraphStyle] != nil
+        }?.attributes[.paragraphStyle] as? NSParagraphStyle
+        let nestedStyle = attrs.reversed().first { entry in
+            NSLocationInRange(nestedBlank, entry.range)
+                && entry.attributes[.paragraphStyle] != nil
+        }?.attributes[.paragraphStyle] as? NSParagraphStyle
+
+        #expect(proseStyle == nil)
+        #expect(nestedStyle?.minimumLineHeight == 1)
+    }
+
     @Test("nested emphasis in a paragraph composes bold+italic")
     func paragraphNestedEmphasis() {
         let attrs = MarkdownASTStyler.styleAttributes(text: "**a *b* c**", fontName: fontName, fontSize: base)

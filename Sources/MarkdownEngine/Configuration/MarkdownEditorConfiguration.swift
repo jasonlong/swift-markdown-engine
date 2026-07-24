@@ -310,6 +310,8 @@ public struct ListStyle: Sendable {
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
     public var extraLineHeight: CGFloat
+    /// Height of blank lines inside a nested loose list, relative to a body line.
+    public var nestedBlankLineHeightScale: CGFloat
 
     public init(
         helpersEnabled: Bool = true,
@@ -319,7 +321,8 @@ public struct ListStyle: Sendable {
         markerContentGap: CGFloat = 0,
         guideOpacity: CGFloat = 0.16,
         maximumNestingLevel: Int = 3,
-        extraLineHeight: CGFloat = 2
+        extraLineHeight: CGFloat = 2,
+        nestedBlankLineHeightScale: CGFloat = 1
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -329,6 +332,7 @@ public struct ListStyle: Sendable {
         self.guideOpacity = guideOpacity
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
+        self.nestedBlankLineHeightScale = nestedBlankLineHeightScale
     }
 
     public static let `default` = ListStyle()
