@@ -386,20 +386,17 @@ struct TaskCheckboxGeometryStylerTests {
         )
     }
 
-    @Test("revealed task (caret in syntax): no collapse, indent uses the full raw width")
-    func revealedTaskKeepsFullSyntaxWidth() {
+    @Test("task syntax stays collapsed when the caret reaches its source range")
+    func taskSyntaxNeverReveals() {
         let attrs = style("- [ ] task", caret: 3)
 
-        // No collapse font on the box while the raw syntax shows.
-        for pos in 2...5 {
-            let f = font(in: attrs, at: pos)
-            #expect(f == nil || f!.pointSize != hiddenSize, "box char at \(pos) must not collapse while revealed")
+        for position in 2...5 {
+            #expect(font(in: attrs, at: position)?.pointSize == hiddenSize)
         }
-        // Wrapped lines align with the visible "- [ ] ".
-        let expected = indentPerLevel + width("- [ ] ")
-        let revealedIndent = headIndent(in: attrs, at: 0)
-        #expect(revealedIndent != nil)
-        #expect(abs((revealedIndent ?? -1) - expected) < 0.01)
+        let expected = indentPerLevel + width("- ")
+        let taskIndent = headIndent(in: attrs, at: 0)
+        #expect(taskIndent != nil)
+        #expect(abs((taskIndent ?? -1) - expected) < 0.01)
     }
 
 }

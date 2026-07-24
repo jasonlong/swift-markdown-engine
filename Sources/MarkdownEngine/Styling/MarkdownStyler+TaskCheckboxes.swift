@@ -2,10 +2,8 @@
 //  MarkdownStyler+TaskCheckboxes.swift
 //  MarkdownEngine
 //
-//  Caret-crossing helper for GitHub-style `- [ ] / - [x]` task syntax. The
-//  checkbox *styling* now lives in the AST styler (`MarkdownASTStyler`); this
-//  only reports whether the caret sits inside the task syntax so the
-//  coordinator can trigger a restyle when the caret enters/leaves.
+//  Protected-prefix helpers for GitHub-style `- [ ] / - [x]` task syntax.
+//  Checkbox styling lives in the AST styler (`MarkdownASTStyler`).
 //
 
 import AppKit
@@ -23,26 +21,54 @@ extension MarkdownStyler {
 
     /// Full `<marker><spacer>[ ]` range if `location` is inside (or at the trailing edge of) it, else nil.
     static func taskSyntaxRange(at location: Int, in text: String) -> NSRange? {
-        let nsText = text as NSString
-        let safeLoc = max(0, min(location, nsText.length))
-        let lineRange = nsText.lineRange(for: NSRange(location: safeLoc, length: 0))
-        let line = nsText.substring(with: lineRange)
-        let match = taskListRegex.firstMatch(
-            in: line,
-            options: [],
-            range: NSRange(location: 0, length: line.utf16.count)
-        )
-        guard let match else { return nil }
+        guard let (lineRange, match) = taskMatch(at: location, in: text) else { return nil }
         let markerLineRange = match.range(at: 2)
         let checkboxLineRange = match.range(at: 4)
         guard markerLineRange.location != NSNotFound,
               checkboxLineRange.location != NSNotFound else { return nil }
         let syntaxStart = lineRange.location + markerLineRange.location
-        let syntaxEnd = lineRange.location + checkboxLineRange.location + checkboxLineRange.length
+        let syntaxEnd = lineRange.location + NSMaxRange(checkboxLineRange)
         let syntaxRange = NSRange(location: syntaxStart, length: syntaxEnd - syntaxStart)
         if NSLocationInRange(location, syntaxRange) || location == syntaxEnd {
             return syntaxRange
         }
         return nil
+    }
+
+    /// Prefix from the physical line start through the whitespace after `[ ]`.
+    /// Locations in this range are presentation-only and cannot host a caret.
+    static func taskProtectedRange(at location: Int, in text: String) -> NSRange? {
+        let nsText = text as NSString
+        guard let (lineRange, match) = taskMatch(at: location, in: text) else { return nil }
+        let checkboxLineRange = match.range(at: 4)
+        guard checkboxLineRange.location != NSNotFound else { return nil }
+        var contentStart = lineRange.location + NSMaxRange(checkboxLineRange)
+        let lineEnd = NSMaxRange(lineRange)
+        while contentStart < lineEnd {
+            let character = nsText.character(at: contentStart)
+            guard character == 0x20 || character == 0x09 else { break }
+            contentStart += 1
+        }
+        let protectedRange = NSRange(
+            location: lineRange.location,
+            length: contentStart - lineRange.location
+        )
+        return NSLocationInRange(location, protectedRange) ? protectedRange : nil
+    }
+
+    private static func taskMatch(
+        at location: Int,
+        in text: String
+    ) -> (lineRange: NSRange, match: NSTextCheckingResult)? {
+        let nsText = text as NSString
+        let safeLocation = max(0, min(location, nsText.length))
+        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
+        let line = nsText.substring(with: lineRange)
+        guard let match = taskListRegex.firstMatch(
+            in: line,
+            options: [],
+            range: NSRange(location: 0, length: line.utf16.count)
+        ) else { return nil }
+        return (lineRange, match)
     }
 }

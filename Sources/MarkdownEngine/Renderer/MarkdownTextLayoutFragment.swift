@@ -666,8 +666,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             // earlier selection-skip here left an empty marker-width gap (the
             // bullet-marker blank-slot bug's twin). Unlike bullets, the raw
             // source can't be painted here instead: the hidden `[ ]` advance
-            // is collapsed, so raw glyphs would overlap the content — raw
-            // reveal stays caret-based (taskRevealed in the styler).
+            // is collapsed, so raw glyphs would overlap the content.
             let isChecked = (value as? Bool) ?? false
             guard let pos = drawPosition(forDocumentCharAt: attrRange.location, point: point) else { return }
 

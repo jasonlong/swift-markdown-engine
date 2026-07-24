@@ -199,16 +199,6 @@ enum MarkdownASTStyler {
         // 1. Indent paragraph style (hanging indent so wrapped lines align).
         let wsRange = NSRange(location: item.range.location, length: item.marker.location - item.range.location)
         let ws = ctx.ns.substring(with: wsRange)
-        // Revealed while the caret edits the syntax (same test as the early
-        // return below): the raw `- [ ]` stays at full advance.
-        let taskRevealed: Bool = {
-            guard let box = item.checkbox else { return false }
-            let syntax = NSRange(location: item.marker.location, length: NSMaxRange(box) - item.marker.location)
-            // Caret edit OR a selection sweeping the syntax reveals the raw
-            // `- [ ]` — matching how token-based elements reveal on selection.
-            return NSLocationInRange(ctx.caret, syntax) || ctx.caret == NSMaxRange(box)
-                || ctx.selectionIntersects(syntax)
-        }()
         let bulletSyntax = NSRange(
             location: item.marker.location,
             length: item.contentRange.location - item.marker.location
@@ -216,13 +206,12 @@ enum MarkdownASTStyler {
         let bulletRevealed = item.checkbox == nil && !item.ordered
             && NSLocationInRange(ctx.caret, bulletSyntax)
         let showsTaskBullet = item.checkbox != nil
-            && !taskRevealed
             && ctx.config.taskCheckbox.showsListBullet
         // Hidden task item shares the bullet geometry: `[ ] ` collapses to ~zero
         // advance below, so the hanging indent measures only `- ` and task
         // content aligns with bullet content (the box replaces the bullet slot).
         let markerGroup: NSRange
-        if let box = item.checkbox, !taskRevealed {
+        if let box = item.checkbox {
             markerGroup = NSRange(location: item.marker.location,
                                   length: box.location - item.marker.location)
         } else {
@@ -231,7 +220,7 @@ enum MarkdownASTStyler {
         }
         let markerWidth = (ctx.ns.substring(with: markerGroup) as NSString)
             .size(withAttributes: [.font: ctx.baseFont]).width
-        let markerContentGap = !item.ordered && !taskRevealed && !bulletRevealed
+        let markerContentGap = !item.ordered && !bulletRevealed
             ? ctx.config.lists.markerContentGap
             : 0
         let taskCheckboxAdvance = showsTaskBullet
@@ -266,7 +255,6 @@ enum MarkdownASTStyler {
 
         // 2. Marker decoration (suppressed while the caret edits the syntax).
         if let box = item.checkbox {
-            if taskRevealed { return }
             let spacer = NSRange(location: NSMaxRange(item.marker), length: box.location - NSMaxRange(item.marker))
             // `- ` keeps full advance (the box's slot, like the bullet `•`);
             // `[ ]` + trailing space collapse to the hidden-marker font so the

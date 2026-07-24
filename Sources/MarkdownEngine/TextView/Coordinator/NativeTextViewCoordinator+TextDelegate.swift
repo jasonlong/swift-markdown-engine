@@ -317,6 +317,7 @@ extension NativeTextViewCoordinator {
         if configuration.rawSourceMode { return }
         if isWritingToolsActive { return }
         if redirectSelectionFromCollapsedOutline(in: tv) { return }
+        if redirectSelectionFromTaskPrefix(in: tv) { return }
         PerfTrace.checkpoint("selIn")
         defer { PerfTrace.checkpoint("selOut") }
         let selRange = tv.selectedRange()
@@ -413,18 +414,6 @@ extension NativeTextViewCoordinator {
 
         let shouldSkipSelectionRestyle = pendingEditedRange != nil
         let tokensChanged = activeTokenIndices != prevActive
-        // Caret crossings in/out of `- [ ]` syntax need a restyle too: task
-        // checkboxes aren't tracked as tokens, so `tokensChanged` won't
-        // notice them, but the styler suppresses the checkbox glyph while
-        // the caret sits inside the syntax. Without this signal a
-        // cursor-out (after editing the brackets) leaves the line stuck on
-        // raw chars.
-        let prevTaskSyntax = previousCaretLocation.flatMap {
-            MarkdownStyler.taskSyntaxRange(at: $0, in: docText)
-        }
-        let currentTaskSyntax = MarkdownStyler.taskSyntaxRange(at: selLoc, in: docText)
-        let taskSyntaxChanged = prevTaskSyntax?.location != currentTaskSyntax?.location
-            || prevTaskSyntax?.length != currentTaskSyntax?.length
         // Caret crossings in/out of a thematic-break (HR) line also need a
         // restyle: HR rendering is a pure attribute (no MarkdownToken), so
         // `tokensChanged` won't notice when the caret enters/leaves an
@@ -443,31 +432,15 @@ extension NativeTextViewCoordinator {
         let currentBulletSyntax = MarkdownStyler.bulletSyntaxRange(at: selLoc, in: docText)
         let bulletSyntaxChanged = prevBulletSyntax?.location != currentBulletSyntax?.location
             || prevBulletSyntax?.length != currentBulletSyntax?.length
-        // Task syntax also reveals while a SELECTION sweeps it (styler is
-        // selection-aware), but none of the caret-based signals above fire
-        // when only the selection SPAN changes (shift-extend keeps the
-        // anchor put). Cheap gate: only spans whose paragraphs contain a
-        // task-marker prefix matter — plain selections never trigger.
-        let paragraphsTouchTaskSyntax: (NSRange?) -> Bool = { range in
-            guard let range, range.length > 0 else { return false }
-            let clamped = NSIntersectionRange(range, NSRange(location: 0, length: nsText.length))
-            guard clamped.length > 0 else { return false }
-            let span = nsText.paragraphRange(for: clamped)
-            for needle in ["- [", "* [", "+ ["]
-            where nsText.range(of: needle, options: [], range: span).location != NSNotFound { return true }
-            return false
-        }
-        let selectionSpanChanged = previousSelectedRange != selRange
-            && ((previousSelectedRange?.length ?? 0) > 0 || selRange.length > 0)
-            && (paragraphsTouchTaskSyntax(previousSelectedRange) || paragraphsTouchTaskSyntax(selRange))
-        // Mid-drag restyle is suppressed (revealing markers shifts the layout → drag hit-test lands short, dropping trailing chars) and replayed on release.
+        // Mid-drag restyle is suppressed because syntax changes can shift
+        // layout while TextKit is extending the selection.
         let isDragSelecting = currentEventType == .leftMouseDragged || currentEventType == .periodic
         if shouldSkipSelectionRestyle {
             needsRestyleAfterDrag = false // textDidChange restyles this edit cycle.
         } else if isDragSelecting {
             needsRestyleAfterDrag = true
-        } else if tokensChanged || taskSyntaxChanged || hrLineChanged || bulletSyntaxChanged
-                    || selectionSpanChanged || needsRestyleAfterDrag {
+        } else if tokensChanged || hrLineChanged || bulletSyntaxChanged
+                    || needsRestyleAfterDrag {
             needsRestyleAfterDrag = false
             // Candidates are built ONLY when a restyle actually runs — this
             // used to happen unconditionally on every selection change,
@@ -479,16 +452,6 @@ extension NativeTextViewCoordinator {
             if let prevLoc = previousCaretLocation, prevLoc != caretLoc {
                 let safePrev = min(prevLoc, nsText.length)
                 paragraphCandidates.append(nsText.paragraphRange(for: NSRange(location: safePrev, length: 0)))
-            }
-            // Selection-revealed task syntax lives anywhere in the selected
-            // span (old and new) — scope the restyle over both so extends
-            // reveal newly covered task lines and deselects re-hide the old
-            // ones. Gated on the task probe so plain selections never widen
-            // the scope beyond the caret paragraphs.
-            for span in [previousSelectedRange, selRange] where paragraphsTouchTaskSyntax(span) {
-                guard let span else { continue }
-                let clamped = NSIntersectionRange(span, NSRange(location: 0, length: nsText.length))
-                if clamped.length > 0 { paragraphCandidates.append(nsText.paragraphRange(for: clamped)) }
             }
             // Latex/imageEmbed tokens only inside the caret/previous-caret
             // paragraphs (binary-searched); the rendered↔raw flip of a token
@@ -718,6 +681,15 @@ extension NativeTextViewCoordinator {
         if isUndoRedo {
             pendingPreEditActiveTokenIndices = nil
             return true
+        }
+        if editTouchesProtectedTaskPrefix(
+            affectedRange: affectedCharRange,
+            replacement: replacementString,
+            in: preText
+        ) {
+            pendingEditedRange = nil
+            pendingPreEditActiveTokenIndices = nil
+            return false
         }
         guard let parsed = preEditParsed else { return true }
         pendingPreEditActiveTokenIndices = activeTokenIndices(
