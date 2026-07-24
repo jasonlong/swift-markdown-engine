@@ -663,11 +663,7 @@ enum MarkdownASTStyler {
         attrs.append((range, [.spellingState: 0]))
         let nodeName = ctx.ns.substring(with: name)
         let linkID = ctx.wikiLinkID(range)
-        var contentAttrs: [NSAttributedString.Key: Any] = [
-            // NSTextView underlines `.link` runs by default. Wiki links use
-            // color—not an underline—to distinguish them from body text.
-            .underlineStyle: 0,
-        ]
+        var contentAttrs: [NSAttributedString.Key: Any] = [:]
         if let linkID { contentAttrs[.wikiLinkID] = linkID }
         if !ctx.isActive(range) {
             // Resolve by the stable UUID when present 

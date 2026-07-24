@@ -247,6 +247,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.overscrollPercent = configuration.overscroll.percent
         textView.maxOverscrollPoints = configuration.overscroll.maxPoints
         textView.minOverscrollPoints = configuration.overscroll.minPoints
+        // AppKit's default link attributes add an underline to every `.link`
+        // run. Wiki links use `.link` for click handling but should be
+        // distinguished by color alone. Markdown links opt into their own
+        // underline in the styler, so omitting it here preserves that style.
+        textView.linkTextAttributes = [.foregroundColor: configuration.theme.link]
         context.coordinator.configuration = configuration
         textView.insertionPointColor = configuration.theme.insertionPoint
         textView.isEditable = isEditable

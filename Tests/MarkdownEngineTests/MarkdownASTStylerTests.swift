@@ -196,7 +196,7 @@ struct MarkdownASTStylerTests {
         }
 
         #expect(attribute(.link, at: 2) != nil)
-        #expect(attribute(.underlineStyle, at: 2) as? Int == 0)
+        #expect(attribute(.underlineStyle, at: 2) == nil)
         #expect(
             attribute(.underlineStyle, at: (text as NSString).range(of: "web").location)
                 as? Int == NSUnderlineStyle.single.rawValue
