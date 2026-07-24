@@ -386,6 +386,14 @@ struct TaskCheckboxGeometryStylerTests {
         )
     }
 
+    @Test("bullet marker stays rendered when the caret reaches its source range")
+    func bulletSyntaxNeverReveals() {
+        let attributes = style("* item", caret: 0)
+
+        #expect(attribute(.bulletMarker, in: attributes, at: 0) as? Bool == true)
+        #expect(attribute(.foregroundColor, in: attributes, at: 0) as? NSColor == .clear)
+    }
+
     @Test("task syntax stays collapsed when the caret reaches its source range")
     func taskSyntaxNeverReveals() {
         let attrs = style("- [ ] task", caret: 3)

@@ -199,12 +199,6 @@ enum MarkdownASTStyler {
         // 1. Indent paragraph style (hanging indent so wrapped lines align).
         let wsRange = NSRange(location: item.range.location, length: item.marker.location - item.range.location)
         let ws = ctx.ns.substring(with: wsRange)
-        let bulletSyntax = NSRange(
-            location: item.marker.location,
-            length: item.contentRange.location - item.marker.location
-        )
-        let bulletRevealed = item.checkbox == nil && !item.ordered
-            && NSLocationInRange(ctx.caret, bulletSyntax)
         let showsTaskBullet = item.checkbox != nil
             && ctx.config.taskCheckbox.showsListBullet
         // Hidden task item shares the bullet geometry: `[ ] ` collapses to ~zero
@@ -220,7 +214,7 @@ enum MarkdownASTStyler {
         }
         let markerWidth = (ctx.ns.substring(with: markerGroup) as NSString)
             .size(withAttributes: [.font: ctx.baseFont]).width
-        let markerContentGap = !item.ordered && !bulletRevealed
+        let markerContentGap = !item.ordered
             ? ctx.config.lists.markerContentGap
             : 0
         let taskCheckboxAdvance = showsTaskBullet
@@ -293,7 +287,6 @@ enum MarkdownASTStyler {
                 ))
             }
         } else if !item.ordered {
-            if bulletRevealed { return }
             attrs.append((item.marker, [
                 .bulletMarker: true,
                 .foregroundColor: NSColor.clear,

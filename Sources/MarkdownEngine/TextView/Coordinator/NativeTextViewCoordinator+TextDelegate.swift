@@ -317,7 +317,7 @@ extension NativeTextViewCoordinator {
         if configuration.rawSourceMode { return }
         if isWritingToolsActive { return }
         if redirectSelectionFromCollapsedOutline(in: tv) { return }
-        if redirectSelectionFromTaskPrefix(in: tv) { return }
+        if redirectSelectionFromProtectedListPrefix(in: tv) { return }
         PerfTrace.checkpoint("selIn")
         defer { PerfTrace.checkpoint("selOut") }
         let selRange = tv.selectedRange()
@@ -425,13 +425,6 @@ extension NativeTextViewCoordinator {
         let currentHRLine = MarkdownStyler.hrLineRange(at: selLoc, in: docText)
         let hrLineChanged = prevHRLine?.location != currentHRLine?.location
             || prevHRLine?.length != currentHRLine?.length
-        // Bullet markers: caret in/out of `- ` syntax flips glyph ↔ raw.
-        let prevBulletSyntax = previousCaretLocation.flatMap {
-            MarkdownStyler.bulletSyntaxRange(at: $0, in: docText)
-        }
-        let currentBulletSyntax = MarkdownStyler.bulletSyntaxRange(at: selLoc, in: docText)
-        let bulletSyntaxChanged = prevBulletSyntax?.location != currentBulletSyntax?.location
-            || prevBulletSyntax?.length != currentBulletSyntax?.length
         // Mid-drag restyle is suppressed because syntax changes can shift
         // layout while TextKit is extending the selection.
         let isDragSelecting = currentEventType == .leftMouseDragged || currentEventType == .periodic
@@ -439,8 +432,7 @@ extension NativeTextViewCoordinator {
             needsRestyleAfterDrag = false // textDidChange restyles this edit cycle.
         } else if isDragSelecting {
             needsRestyleAfterDrag = true
-        } else if tokensChanged || hrLineChanged || bulletSyntaxChanged
-                    || needsRestyleAfterDrag {
+        } else if tokensChanged || hrLineChanged || needsRestyleAfterDrag {
             needsRestyleAfterDrag = false
             // Candidates are built ONLY when a restyle actually runs — this
             // used to happen unconditionally on every selection change,
@@ -682,7 +674,7 @@ extension NativeTextViewCoordinator {
             pendingPreEditActiveTokenIndices = nil
             return true
         }
-        if editTouchesProtectedTaskPrefix(
+        if editTouchesProtectedListPrefix(
             affectedRange: affectedCharRange,
             replacement: replacementString,
             in: preText

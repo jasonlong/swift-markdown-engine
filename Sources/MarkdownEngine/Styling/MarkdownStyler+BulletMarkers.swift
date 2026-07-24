@@ -2,12 +2,10 @@
 //  MarkdownStyler+BulletMarkers.swift
 //  MarkdownEngine
 //
-//  Caret-crossing helper for `-`/`*`/`+` bullet syntax. Bullet *rendering*
-//  (the `•` overlay) now lives in the AST styler (`MarkdownASTStyler`); this
-//  only reports caret membership so the coordinator can restyle on crossings.
+//  Protected-prefix helpers for `-`/`*`/`+` bullet syntax. Bullet rendering
+//  (the vector overlay) lives in the AST styler (`MarkdownASTStyler`).
 //
 
-import AppKit
 import Foundation
 
 extension MarkdownStyler {
@@ -18,29 +16,24 @@ extension MarkdownStyler {
         options: [.anchorsMatchLines]
     )
 
-    // MARK: Bullet Syntax Membership
-
-    /// `<marker><spaces>` range on `location`'s line, or `nil` if the caret isn't strictly inside.
-    static func bulletSyntaxRange(at location: Int, in text: String) -> NSRange? {
+    /// Prefix from the physical line start through the marker's trailing whitespace.
+    static func bulletProtectedRange(at location: Int, in text: String) -> NSRange? {
         let nsText = text as NSString
-        let safeLoc = max(0, min(location, nsText.length))
-        let lineRange = nsText.lineRange(for: NSRange(location: safeLoc, length: 0))
+        let safeLocation = max(0, min(location, nsText.length))
+        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
         let line = nsText.substring(with: lineRange)
         guard let match = bulletListRegex.firstMatch(
             in: line,
             options: [],
-            range: NSRange(location: 0, length: line.utf16.count)
+            range: NSRange(location: 0, length: (line as NSString).length)
         ) else { return nil }
-        let markerLineRange = match.range(at: 2)
-        let spacerLineRange = match.range(at: 3)
-        guard markerLineRange.location != NSNotFound,
-              spacerLineRange.location != NSNotFound else { return nil }
-        let syntaxStart = lineRange.location + markerLineRange.location
-        let syntaxEnd = lineRange.location + spacerLineRange.location + spacerLineRange.length
-        let syntaxRange = NSRange(location: syntaxStart, length: syntaxEnd - syntaxStart)
-        if NSLocationInRange(location, syntaxRange) {
-            return syntaxRange
-        }
-        return nil
+        let spacingRange = match.range(at: 3)
+        guard spacingRange.location != NSNotFound else { return nil }
+        let contentStart = lineRange.location + NSMaxRange(spacingRange)
+        let protectedRange = NSRange(
+            location: lineRange.location,
+            length: contentStart - lineRange.location
+        )
+        return NSLocationInRange(location, protectedRange) ? protectedRange : nil
     }
 }

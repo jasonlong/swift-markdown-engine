@@ -35,6 +35,12 @@ extension MarkdownStyler {
         return nil
     }
 
+    /// Protected prefix for either a task or ordinary unordered-list item.
+    static func listProtectedRange(at location: Int, in text: String) -> NSRange? {
+        taskProtectedRange(at: location, in: text)
+            ?? bulletProtectedRange(at: location, in: text)
+    }
+
     /// Prefix from the physical line start through the whitespace after `[ ]`.
     /// Locations in this range are presentation-only and cannot host a caret.
     static func taskProtectedRange(at location: Int, in text: String) -> NSRange? {

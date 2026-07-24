@@ -1,11 +1,11 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
-    func redirectSelectionFromTaskPrefix(in textView: NSTextView) -> Bool {
-        guard !isAdjustingTaskSelection else { return false }
+    func redirectSelectionFromProtectedListPrefix(in textView: NSTextView) -> Bool {
+        guard !isAdjustingListSelection else { return false }
         let selection = textView.selectedRange()
         guard selection.length == 0,
-              let protectedRange = MarkdownStyler.taskProtectedRange(
+              let protectedRange = MarkdownStyler.listProtectedRange(
                 at: selection.location,
                 in: textView.string
               ) else { return false }
@@ -20,13 +20,13 @@ extension NativeTextViewCoordinator {
             ? protectedRange.location - 1
             : NSMaxRange(protectedRange)
 
-        isAdjustingTaskSelection = true
+        isAdjustingListSelection = true
         textView.setSelectedRange(NSRange(location: target, length: 0))
-        isAdjustingTaskSelection = false
+        isAdjustingListSelection = false
         return true
     }
 
-    func editTouchesProtectedTaskPrefix(
+    func editTouchesProtectedListPrefix(
         affectedRange: NSRange,
         replacement: String?,
         in text: String
@@ -46,7 +46,7 @@ extension NativeTextViewCoordinator {
             max(affectedRange.location, NSMaxRange(affectedRange) - 1),
         ]
         for location in probeLocations {
-            guard let protectedRange = MarkdownStyler.taskProtectedRange(
+            guard let protectedRange = MarkdownStyler.listProtectedRange(
                 at: location,
                 in: text
             ) else { continue }

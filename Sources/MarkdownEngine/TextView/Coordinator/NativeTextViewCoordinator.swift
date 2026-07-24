@@ -93,7 +93,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     var activeTokenIndices: Set<Int> = []
     var previousActiveTokenIndices: Set<Int> = []
     var isAdjustingOutlineSelection = false
-    var isAdjustingTaskSelection = false
+    var isAdjustingListSelection = false
     var wikiLinkMetadata: [WikiLinkService.RangeKey: WikiLinkService.LinkMetadata] = [:]
     var previousBacktickCount: Int = 0
     /// Backtick census baseline captured in shouldChangeTextIn: the pre-edit

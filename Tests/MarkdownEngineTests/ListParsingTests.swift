@@ -77,10 +77,8 @@ struct ListParsingTests {
         #expect(blocks.contains { if case .paragraph = $0.kind { return true }; return false })
     }
 
-    /// The caret-crossing trigger must recognize the same task markers the
-    /// styler does — incl. `*`/`+` (the styler treats `* [ ]` as a task; if the
-    /// trigger disagrees the raw syntax won't reveal on caret entry).
-    @Test func taskTriggerRecognizesStarAndPlusMarkers() {
+    /// Protected task prefixes recognize every unordered-list marker.
+    @Test func taskPrefixRecognizesStarAndPlusMarkers() {
         #expect(MarkdownStyler.taskSyntaxRange(at: 0, in: "- [ ] task") != nil)
         #expect(MarkdownStyler.taskSyntaxRange(at: 0, in: "* [ ] task") != nil)
         #expect(MarkdownStyler.taskSyntaxRange(at: 0, in: "+ [ ] task") != nil)
