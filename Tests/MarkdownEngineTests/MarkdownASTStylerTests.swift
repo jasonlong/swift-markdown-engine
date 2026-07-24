@@ -17,6 +17,12 @@ struct MarkdownASTStylerTests {
     private let base: CGFloat = 14
     private var fontName: String { NSFont.systemFont(ofSize: 14).fontName }
 
+    private struct ExistingWikiLinkResolver: WikiLinkResolver {
+        func resolve(displayName: String, range: NSRange) -> WikiLinkResolution? {
+            WikiLinkResolution(id: displayName, exists: true)
+        }
+    }
+
     /// Effective font at `pos`: the last styled range covering it that sets `.font`.
     private func font(in attrs: [StyledRange], at pos: Int) -> NSFont? {
         var result: NSFont?
@@ -169,6 +175,32 @@ struct MarkdownASTStylerTests {
         #expect(spellingStates(intersecting: fencedContent).contains(0))
         #expect(spellingStates(intersecting: inlineSpan).contains(0))
         #expect(spellingStates(intersecting: prose).isEmpty)
+    }
+
+    @Test("wiki links are clickable without an underline")
+    func wikiLinksAreNotUnderlined() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.services.wikiLinks = ExistingWikiLinkResolver()
+        let text = "[[Linked note]] and [web](https://example.com)"
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+
+        func attribute(_ key: NSAttributedString.Key, at position: Int) -> Any? {
+            attrs.reversed().first {
+                NSLocationInRange(position, $0.range) && $0.attributes[key] != nil
+            }?.attributes[key]
+        }
+
+        #expect(attribute(.link, at: 2) != nil)
+        #expect(attribute(.underlineStyle, at: 2) as? Int == 0)
+        #expect(
+            attribute(.underlineStyle, at: (text as NSString).range(of: "web").location)
+                as? Int == NSUnderlineStyle.single.rawValue
+        )
     }
 
     /// Effective color at `pos`: the last styled range covering it that sets `.foregroundColor`.
