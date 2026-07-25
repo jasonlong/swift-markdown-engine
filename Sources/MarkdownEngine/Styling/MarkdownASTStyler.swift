@@ -97,7 +97,14 @@ enum MarkdownASTStyler {
         let checkboxRanges = collectCheckboxRanges(in: blocks)
         let linkRanges = collectLinkRanges(in: blocks)
         styleAutoLinks(ctx: ctx, codeRanges: codeRanges, linkRanges: linkRanges, into: &attrs)
-        styleIncompleteLinkBrackets(ctx: ctx, codeRanges: codeRanges, checkboxRanges: checkboxRanges, into: &attrs)
+        styleIncompleteLinkBrackets(
+            ctx: ctx,
+            codeRanges: codeRanges,
+            checkboxRanges: checkboxRanges,
+            linkRanges: linkRanges,
+            into: &attrs
+        )
+        styleCompletedTasks(in: blocks, ctx: ctx, into: &attrs)
         return attrs
     }
 
@@ -264,6 +271,13 @@ enum MarkdownASTStyler {
         attrs.append((line, [.paragraphStyle: ps]))
 
         // 2. Marker decoration (suppressed while the caret edits the syntax).
+        if !item.ordered {
+            let prefixRange = NSRange(
+                location: item.range.location,
+                length: item.contentRange.location - item.range.location
+            )
+            attrs.append((prefixRange, [.listMarkerPrefix: true]))
+        }
         if let box = item.checkbox {
             let spacer = NSRange(location: NSMaxRange(item.marker), length: box.location - NSMaxRange(item.marker))
             // `- ` keeps full advance (the box's slot, like the bullet `•`);
@@ -285,30 +299,81 @@ enum MarkdownASTStyler {
             if postGap.length > 0 {
                 attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
             }
-            if item.checked, NSMaxRange(item.range) > NSMaxRange(box) {
-                var checkedAttributes: [NSAttributedString.Key: Any] = [:]
-                if ctx.config.taskCheckbox.strikesCheckedText {
-                    checkedAttributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
-                    checkedAttributes[.strikethroughColor] =
-                        ctx.config.taskCheckbox.checkedTextColor ?? ctx.theme.strikethroughColor
-                }
-                if let checkedTextColor = ctx.config.taskCheckbox.checkedTextColor {
-                    checkedAttributes[.foregroundColor] = checkedTextColor
-                }
-                attrs.append((
-                    NSRange(
-                        location: NSMaxRange(box),
-                        length: NSMaxRange(item.range) - NSMaxRange(box)
-                    ),
-                    checkedAttributes
-                ))
-            }
         } else if !item.ordered {
             attrs.append((item.marker, [
                 .bulletMarker: true,
                 .foregroundColor: NSColor.clear,
                 .kern: additionalMarkerAdvance,
             ]))
+        }
+    }
+
+    /// Completed-task presentation is applied after inline styling so links
+    /// keep their navigation metadata while sharing the task's muted color.
+    private static func styleCompletedTask(
+        _ item: ListItem,
+        ctx: Ctx,
+        into attrs: inout [StyledRange]
+    ) {
+        guard item.checked, item.contentRange.length > 0 else { return }
+
+        var checkedAttributes: [NSAttributedString.Key: Any] = [:]
+        if ctx.config.taskCheckbox.strikesCheckedText {
+            checkedAttributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+            checkedAttributes[.strikethroughColor] =
+                ctx.config.taskCheckbox.checkedTextColor ?? ctx.theme.strikethroughColor
+        }
+        if let checkedTextColor = ctx.config.taskCheckbox.checkedTextColor {
+            checkedAttributes[.foregroundColor] = checkedTextColor
+        }
+        if !checkedAttributes.isEmpty {
+            attrs.append((item.contentRange, checkedAttributes))
+        }
+    }
+
+    /// Completed-task presentation is the final visual override. Links keep a
+    /// distinct checked-state color while remaining quieter than active links.
+    /// Re-collapse inline markers afterward so hidden link syntax stays hidden.
+    private static func styleCompletedTasks(
+        in blocks: [BlockNode],
+        ctx: Ctx,
+        into attrs: inout [StyledRange]
+    ) {
+        for block in blocks {
+            guard case .list(_, let items) = block else { continue }
+            for item in items where item.checked {
+                styleCompletedTask(item, ctx: ctx, into: &attrs)
+                if ctx.config.taskCheckbox.checkedTextColor != nil
+                    || ctx.config.taskCheckbox.checkedLinkColor != nil {
+                    muteLinkMetadata(
+                        in: item.contentRange,
+                        color: ctx.config.taskCheckbox.checkedLinkColor,
+                        attrs: &attrs
+                    )
+                }
+                shrinkInlineMarkers(item.inlines, ctx: ctx, into: &attrs)
+            }
+        }
+    }
+
+    private static func muteLinkMetadata(
+        in range: NSRange,
+        color: NSColor?,
+        attrs: inout [StyledRange]
+    ) {
+        var mutedRanges: [NSRange] = []
+        for index in attrs.indices
+        where NSIntersectionRange(attrs[index].range, range).length > 0 {
+            var attributes = attrs[index].attributes
+            guard let target = attributes.removeValue(forKey: .link) else { continue }
+            attributes[.mutedLink] = target
+            attrs[index] = (attrs[index].range, attributes)
+            mutedRanges.append(attrs[index].range)
+        }
+        if let color {
+            for mutedRange in mutedRanges {
+                attrs.append((mutedRange, [.foregroundColor: color]))
+            }
         }
     }
 
@@ -321,12 +386,21 @@ enum MarkdownASTStyler {
                 guard let match, let url = match.url,
                       !isInCode(match.range, codeRanges),
                       !isInCode(match.range, linkRanges) else { return }
-                attrs.append((match.range, [.link: url]))
+                attrs.append((match.range, [
+                    .link: url,
+                    .foregroundColor: ctx.theme.link,
+                ]))
             }
         }
     }
 
-    private static func styleIncompleteLinkBrackets(ctx: Ctx, codeRanges: [NSRange], checkboxRanges: [NSRange], into attrs: inout [StyledRange]) {
+    private static func styleIncompleteLinkBrackets(
+        ctx: Ctx,
+        codeRanges: [NSRange],
+        checkboxRanges: [NSRange],
+        linkRanges: [NSRange],
+        into attrs: inout [StyledRange]
+    ) {
         let patterns = [#"\[\]"#, #"\[\[\]\]"#, #"\[[^\]\r\n]*$"#, #"\[[^\]\r\n]+\](?!\()"#,
                         #"\[[^\]\r\n]+\]\([^)\r\n]*$"#, #"\[[^\]\r\n]+\]\(\)"#]
         let muted = ctx.theme.mutedText
@@ -335,7 +409,9 @@ enum MarkdownASTStyler {
             guard let re = regex(pattern, false) else { continue }
             for scan in ctx.scanRanges {
               for m in re.matches(in: ctx.text, options: [], range: scan)
-                  where !isInCode(m.range, codeRanges) && !isInCode(m.range, checkboxRanges) {
+                  where !isInCode(m.range, codeRanges)
+                    && !isInCode(m.range, checkboxRanges)
+                    && !isInCode(m.range, linkRanges) {
                 for (i, ch) in ctx.ns.substring(with: m.range).enumerated() {
                     let r = NSRange(location: m.range.location + i, length: 1)
                     let isBracket = ch == "[" || ch == "]" || ch == "(" || ch == ")"
@@ -689,6 +765,7 @@ enum MarkdownASTStyler {
             let exists = ctx.config.services.wikiLinks.resolve(displayName: linkID ?? nodeName, range: name)?.exists ?? false
             if exists {
                 contentAttrs[.link] = linkID ?? nodeName
+                contentAttrs[.foregroundColor] = ctx.theme.link
             } else {
                 contentAttrs[.foregroundColor] = ctx.theme.disabledText
             }

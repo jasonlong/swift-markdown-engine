@@ -230,6 +230,7 @@ struct MarkdownASTStylerTests {
         }
 
         #expect(attribute(.link, at: 2) != nil)
+        #expect(attribute(.foregroundColor, at: 2) as? NSColor == configuration.theme.link)
         #expect(attribute(.underlineStyle, at: 2) == nil)
         #expect(
             attribute(.underlineStyle, at: (text as NSString).range(of: "web").location)
@@ -332,6 +333,12 @@ struct TaskCheckboxGeometryStylerTests {
     private var hiddenSize: CGFloat { MarkdownEditorConfiguration.default.markers.hiddenMarkerFontSize }
     private var indentPerLevel: CGFloat { MarkdownEditorConfiguration.default.lists.indentPerLevel }
 
+    private struct ExistingWikiLinkResolver: WikiLinkResolver {
+        func resolve(displayName: String, range: NSRange) -> WikiLinkResolution? {
+            WikiLinkResolution(id: displayName, exists: true)
+        }
+    }
+
     /// Same measurement call the styler uses for the hanging indent.
     private func width(_ s: String) -> CGFloat {
         (s as NSString).size(withAttributes: [.font: baseFont]).width
@@ -376,6 +383,7 @@ struct TaskCheckboxGeometryStylerTests {
     private func style(
         _ text: String,
         caret: Int = -1,
+        selection: NSRange? = nil,
         configuration: MarkdownEditorConfiguration = .default
     ) -> [StyledRange] {
         MarkdownASTStyler.styleAttributes(
@@ -383,8 +391,27 @@ struct TaskCheckboxGeometryStylerTests {
             fontName: fontName,
             fontSize: base,
             caretLocation: caret,
+            selection: selection,
             configuration: configuration
         )
+    }
+
+    @Test("checkbox shares the bullet marker's visual center at larger scales")
+    func largerCheckboxSharesBulletCenter() {
+        let baselineY: CGFloat = 100
+        let size = TaskCheckboxGeometry.size(for: baseFont, scale: 1.2)
+        let boxY = TaskCheckboxGeometry.boxY(
+            baselineY: baselineY,
+            font: baseFont,
+            size: size
+        )
+        let checkboxCenterY = boxY + size / 2
+        let bulletCenterY = BulletMarkerGeometry.centerY(
+            forBaseline: baselineY,
+            font: baseFont
+        )
+
+        #expect(abs(checkboxCenterY - bulletCenterY) < 0.001)
     }
 
     @Test("hidden task: [ ] collapses to the hidden font and indent equals a bullet's")
@@ -455,12 +482,75 @@ struct TaskCheckboxGeometryStylerTests {
         #expect(attribute(.strikethroughStyle, in: checkedAttributes, at: 6) == nil)
     }
 
+    @Test("links inside completed tasks keep navigation metadata and use the checked-link color")
+    func completedTaskLinksUseCheckedLinkColor() {
+        let text =
+            "- [x] Done [[Linked note]] and [website](https://example.com)"
+        let nsText = text as NSString
+        let completedColor = NSColor.secondaryLabelColor
+        let completedLinkColor = NSColor.systemBlue.withAlphaComponent(0.65)
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.taskCheckbox.checkedTextColor = completedColor
+        configuration.taskCheckbox.checkedLinkColor = completedLinkColor
+        configuration.taskCheckbox.strikesCheckedText = false
+        configuration.services.wikiLinks = ExistingWikiLinkResolver()
+
+        let attributes = style(text, configuration: configuration)
+        let wikiPosition = nsText.range(of: "Linked note").location
+        let webPosition = nsText.range(of: "website").location
+
+        #expect(attribute(.link, in: attributes, at: wikiPosition) == nil)
+        #expect(attribute(.link, in: attributes, at: webPosition) == nil)
+        #expect(attribute(.mutedLink, in: attributes, at: wikiPosition) != nil)
+        #expect(attribute(.mutedLink, in: attributes, at: webPosition) != nil)
+        #expect(
+            attribute(.foregroundColor, in: attributes, at: wikiPosition) as? NSColor
+                == completedLinkColor
+        )
+        #expect(
+            attribute(.foregroundColor, in: attributes, at: webPosition) as? NSColor
+                == completedLinkColor
+        )
+        let prosePosition = nsText.range(of: "Done").location
+        #expect(
+            attribute(.foregroundColor, in: attributes, at: prosePosition) as? NSColor
+                == completedColor
+        )
+    }
+
     @Test("bullet marker stays rendered when the caret reaches its source range")
     func bulletSyntaxNeverReveals() {
         let attributes = style("* item", caret: 0)
 
         #expect(attribute(.bulletMarker, in: attributes, at: 0) as? Bool == true)
         #expect(attribute(.foregroundColor, in: attributes, at: 0) as? NSColor == .clear)
+    }
+
+    @Test("multi-line selections keep bullet prefixes in the rendered gutter")
+    func selectedBulletPrefixesStayRendered() {
+        let text = "- first\n- second"
+        let attributes = style(
+            text,
+            selection: NSRange(location: 2, length: 11)
+        )
+
+        for marker in [0, 8] {
+            #expect(
+                attribute(.bulletMarker, in: attributes, at: marker) as? Bool
+                    == true
+            )
+            #expect(
+                attribute(
+                    .listMarkerPrefix,
+                    in: attributes,
+                    at: marker
+                ) as? Bool == true
+            )
+            #expect(
+                attribute(.foregroundColor, in: attributes, at: marker)
+                    as? NSColor == .clear
+            )
+        }
     }
 
     @Test("task syntax stays collapsed when the caret reaches its source range")

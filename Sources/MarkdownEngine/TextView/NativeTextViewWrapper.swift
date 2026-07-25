@@ -80,6 +80,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// resolved opaque identifier (or the display name when no resolver
     /// was supplied).
     public var onLinkClick: ((String) -> Void)?
+    /// Fires when the pointer enters or leaves a rendered wiki link. A
+    /// non-nil value contains the target and native anchor geometry; `nil`
+    /// means the pointer is no longer over a wiki link.
+    public var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
     /// Fires whenever the caret rect inside an active wiki-link changes,
     /// so embedders can position a follow-the-caret UI.
     public var onCaretRectChange: ((CGRect) -> Void)?
@@ -142,6 +146,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         isEditable: Bool = true,
         onPasteImage: ((NSPasteboard) -> String?)? = nil,
         onLinkClick: ((String) -> Void)? = nil,
+        onWikiLinkHover: ((WikiLinkHoverState?) -> Void)? = nil,
         onCaretRectChange: ((CGRect) -> Void)? = nil,
         onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)? = nil,
         onInlineSelectionChange: ((InlineSelectionState?) -> Void)? = nil,
@@ -166,6 +171,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.isEditable = isEditable
         self.onPasteImage = onPasteImage
         self.onLinkClick = onLinkClick
+        self.onWikiLinkHover = onWikiLinkHover
         self.onCaretRectChange = onCaretRectChange
         self.onBuildContextMenu = onBuildContextMenu
         self.onInlineSelectionChange = onInlineSelectionChange
@@ -251,6 +257,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // run. Wiki links use `.link` for click handling but should be
         // distinguished by color alone. Markdown links opt into their own
         // underline in the styler, so omitting it here preserves that style.
+        // Completed tasks use `.mutedLink` and bypass this global link color.
         textView.linkTextAttributes = [.foregroundColor: configuration.theme.link]
         context.coordinator.configuration = configuration
         textView.insertionPointColor = configuration.theme.insertionPoint
@@ -281,6 +288,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
+        textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
             textView.writingToolsBehavior = .complete
@@ -383,6 +391,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.nativeTextView else { return }
+        // Keep event callbacks current before any transient early-return path
+        // (notably an active Writing Tools session).
+        textView.onWikiLinkHover = onWikiLinkHover
         reconcileHeader(textView: textView, context: context)
 
         let isNodeSwitch = context.coordinator.documentId != documentId

@@ -10,6 +10,7 @@ import AppKit
 
 extension NativeTextView {
     override func keyDown(with event: NSEvent) {
+        if handleOptionArrow(event) { return }
         if handleCommandReturn(event) { return }
         super.keyDown(with: event)
     }
@@ -52,5 +53,20 @@ extension NativeTextView {
         let shortcutModifiers = modifiers.subtracting(ignoredModifiers)
         return shortcutModifiers == .command
             && (event.keyCode == 36 || event.keyCode == 76)
+    }
+
+    func handleOptionArrow(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let ignoredModifiers: NSEvent.ModifierFlags = [.capsLock, .numericPad, .function]
+        let shortcutModifiers = modifiers.subtracting(ignoredModifiers)
+        guard shortcutModifiers == .option else { return false }
+        switch event.keyCode {
+        case 126:
+            return moveBulletItem(.up)
+        case 125:
+            return moveBulletItem(.down)
+        default:
+            return false
+        }
     }
 }

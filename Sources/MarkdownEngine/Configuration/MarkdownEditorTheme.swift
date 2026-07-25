@@ -26,6 +26,13 @@ import Foundation
 /// colors, so light/dark-mode switching keeps working without extra code.
 public struct MarkdownEditorTheme: Sendable {
 
+    // MARK: Surfaces
+
+    /// Opaque color behind editor text. The text view itself may remain
+    /// transparent, but custom list affordances use this color to keep their
+    /// gutter outside TextKit's cross-line selection bands.
+    public var editorBackground: NSColor
+
     // MARK: Text colors
 
     /// Foreground color for plain body text.
@@ -84,6 +91,7 @@ public struct MarkdownEditorTheme: Sendable {
     // MARK: Init
 
     public init(
+        editorBackground: NSColor = .textBackgroundColor,
         bodyText: NSColor = .labelColor,
         insertionPoint: NSColor = .labelColor,
         mutedText: NSColor = .secondaryLabelColor,
@@ -98,6 +106,7 @@ public struct MarkdownEditorTheme: Sendable {
         strikethroughColor: NSColor = .labelColor,
         highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4)
     ) {
+        self.editorBackground = editorBackground
         self.bodyText = bodyText
         self.insertionPoint = insertionPoint
         self.mutedText = mutedText

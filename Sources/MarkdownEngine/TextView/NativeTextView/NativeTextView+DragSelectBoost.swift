@@ -14,10 +14,14 @@ extension NativeTextView {
     override func mouseDown(with event: NSEvent) {
         // Was the click point on a link? Captured before super.mouseDown, which
         // may park the caret elsewhere. Used to rescue a dropped link click.
-        let clickPointOnLink: Bool = {
+        let clickedLink: (location: Int, target: Any)? = {
             let idx = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
-            guard let ts = textStorage, idx >= 0, idx < ts.length else { return false }
-            return ts.attribute(.link, at: idx, effectiveRange: nil) != nil
+            guard let ts = textStorage, idx >= 0, idx < ts.length else {
+                return nil
+            }
+            let target = ts.attribute(.link, at: idx, effectiveRange: nil)
+                ?? ts.attribute(.mutedLink, at: idx, effectiveRange: nil)
+            return target.map { (idx, $0) }
         }()
         if toggleOutlineIfHit(event: event) { return }
         if let toggled = toggleTaskCheckboxIfHit(event: event), toggled { return }
@@ -40,21 +44,21 @@ extension NativeTextView {
         let travel = hypot(NSEvent.mouseLocation.x - downLoc.x, NSEvent.mouseLocation.y - downLoc.y)
 
         // AppKit intermittently drops clickedOnLink for a stationary single click
-        // on a link (caret placed, delegate never called). Re-dispatch it through
-        // the same delegate path — clickedOnLink applies the edit zone/resolution.
+        // on a link (selection changed, delegate never called). Re-dispatch it
+        // through the same delegate path using the original hit-tested location.
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if clickPointOnLink, !linkClickDidFire, event.clickCount == 1, mods.isEmpty,
-           travel < 2, selectedRange().length == 0,
+        if let clickedLink,
+           !linkClickDidFire, event.clickCount == 1, mods.isEmpty, travel < 2,
            let ts = textStorage, ts.length > 0 {
-            let caret = min(selectedRange().location, ts.length - 1)
-            let onCaret = ts.attribute(.link, at: caret, effectiveRange: nil) != nil
-            let linkAttr = onCaret ? ts.attribute(.link, at: caret, effectiveRange: nil)
-                : (caret > 0 ? ts.attribute(.link, at: caret - 1, effectiveRange: nil) : nil)
-            let linkIdx = onCaret ? caret : caret - 1
-            if let linkAttr, let dlg = delegate as? NativeTextViewCoordinator,
-               !dlg.textView(self, clickedOnLink: linkAttr, at: linkIdx) {
+            if let dlg = delegate as? NativeTextViewCoordinator,
+               !dlg.textView(
+                self,
+                clickedOnLink: clickedLink.target,
+                at: clickedLink.location
+               ) {
                 // Web link: the delegate declines; open the URL as AppKit would.
-                if let url = (linkAttr as? URL) ?? (linkAttr as? String).flatMap(URL.init(string:)),
+                if let url = (clickedLink.target as? URL)
+                    ?? (clickedLink.target as? String).flatMap(URL.init(string:)),
                    url.scheme != nil {
                     NSWorkspace.shared.open(url)
                 }

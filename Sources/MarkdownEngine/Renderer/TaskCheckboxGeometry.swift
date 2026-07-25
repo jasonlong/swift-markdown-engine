@@ -30,4 +30,14 @@ enum TaskCheckboxGeometry {
     static func boxX(contentX: CGFloat, size: CGFloat, gap: CGFloat) -> CGFloat {
         contentX - size - gap
     }
+
+    /// Top edge of a square centered on the same first-line visual center used
+    /// by bullet markers. Using the font's full ascender/descender bounds here
+    /// makes task controls drift relative to bullets for fonts such as SF Pro.
+    static func boxY(baselineY: CGFloat, font: NSFont, size: CGFloat) -> CGFloat {
+        BulletMarkerGeometry.centerY(
+            forBaseline: baselineY,
+            font: font
+        ) - size / 2
+    }
 }

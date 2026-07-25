@@ -86,6 +86,7 @@ extension NativeTextViewCoordinator {
             if let bottomTextView = tv as? NativeTextView,
                let scrollView = tv.enclosingScrollView {
                 bottomTextView.recalcOverscroll(for: scrollView, debugTag: "textDidChange")
+                bottomTextView.scheduleFitContentRemeasure()
                 (scrollView as? ClampedScrollView)?.clampToInsets()
             }
             return
@@ -235,6 +236,11 @@ extension NativeTextViewCoordinator {
         activeTokenIndices = PerfTrace.measure("activeTok") {
             activeTokenIndices(parsed: parsed, selection: safeSelRange, in: fullText, suppressed: !tv.isEditable)
         }
+        removeAtomicWikiLinks(
+            from: &activeTokenIndices,
+            parsed: parsed,
+            in: tv
+        )
         filterImageEmbedActiveTokens(parsed: parsed, text: fullText, selectionLocation: safeSelRange.location)
         updateAutocorrectSettings(
             tv,
@@ -304,6 +310,7 @@ extension NativeTextViewCoordinator {
             if let bottomTextView = tv as? NativeTextView,
                let scrollView = tv.enclosingScrollView {
                 bottomTextView.recalcOverscroll(for: scrollView, debugTag: "textDidChange")
+                bottomTextView.scheduleFitContentRemeasure()
                 (scrollView as? ClampedScrollView)?.clampToInsets()
             }
         }
@@ -331,7 +338,10 @@ extension NativeTextViewCoordinator {
         // Mouse-/Wake-Fokus auf Link: kein Preview, erst Navigation. Gilt für alle Nicht-Key-Events.
         if currentEventType != .keyDown,
            selRange.location < nsText.length,
-           tv.textStorage?.attribute(.link, at: selRange.location, effectiveRange: nil) != nil {
+           tv.textStorage.map({
+               $0.attribute(.link, at: selRange.location, effectiveRange: nil) != nil
+                   || $0.attribute(.mutedLink, at: selRange.location, effectiveRange: nil) != nil
+           }) == true {
             isImageEmbedActive = false
             isWikiLinkActive = false
             onInlineSelectionChange?(nil)
@@ -361,6 +371,11 @@ extension NativeTextViewCoordinator {
         let prevActive = activeTokenIndices
         PerfTrace.measure("selActive") {
             activeTokenIndices = activeTokenIndices(parsed: parsed, selection: selRange, in: nsText, suppressed: !tv.isEditable)
+            removeAtomicWikiLinks(
+                from: &activeTokenIndices,
+                parsed: parsed,
+                in: tv
+            )
             filterImageEmbedActiveTokens(parsed: parsed, text: nsText, selectionLocation: selRange.location)
         }
 
@@ -684,6 +699,15 @@ extension NativeTextViewCoordinator {
             return false
         }
         guard let parsed = preEditParsed else { return true }
+        if partiallyEditsAtomicWikiLink(
+            affectedRange: affectedCharRange,
+            parsed: parsed,
+            in: textView
+        ) {
+            pendingEditedRange = nil
+            pendingPreEditActiveTokenIndices = nil
+            return false
+        }
         pendingPreEditActiveTokenIndices = activeTokenIndices(
             parsed: parsed,
             selection: textView.selectedRange(),
@@ -748,31 +772,39 @@ extension NativeTextViewCoordinator {
         // AppKit didn't drop the dispatch.
         (textView as? NativeTextView)?.linkClickDidFire = true
         // Edit zone: a click on the outer ~30% of a link's first/last visible char places the caret
-        // just outside the markers (before '[[' / '[' , after ']]' / ')') to reveal the source for
-        // editing instead of navigating. Applies to both wiki links [[…]] and web links [text](url).
-        // Editable views only — read-only links must stay navigable.
+        // just outside the `[` / `)` markers to reveal the source for editing instead of navigating.
+        // This applies only to web links [text](url).
+        // Wiki links are atomic mentions and always navigate, including while the
+        // surrounding line is being edited.
         if textView.isEditable, let storage = textView.textStorage {
+            let clickedToken = parsedDocument(for: textView.string).tokens
+                .first {
+                    ($0.kind == .wikiLink || $0.kind == .link)
+                        && NSLocationInRange(charIndex, $0.range)
+                }
             var linkRange = NSRange(location: NSNotFound, length: 0)
             let editZoneMinNameLength = 3   // 1–2 char names stay fully clickable for navigation
-            if storage.attribute(.link, at: charIndex, longestEffectiveRange: &linkRange,
+            let linkKey: NSAttributedString.Key =
+                storage.attribute(.link, at: charIndex, effectiveRange: nil) != nil
+                ? .link
+                : .mutedLink
+            if clickedToken?.kind != .wikiLink,
+               storage.attribute(linkKey, at: charIndex, longestEffectiveRange: &linkRange,
                                  in: NSRange(location: 0, length: storage.length)) != nil,
                linkRange.length >= editZoneMinNameLength {
-                // Caret lands on the token's outer markers ('[['/'[' or ']]'/')'), which carry no
+                // Caret lands on the token's outer markers ('[' or ')'), which carry no
                 // .link, so the mouse-on-link guard in textViewDidChangeSelection doesn't suppress
-                // the reveal. Web links (.link) get the same edit zone as wiki links (.wikiLink); the
-                // .link attribute only spans the visible text, so without the full token range a web
+                // the reveal. The .link attribute only spans the visible text, so without the full token range a web
                 // link would drop the caret between its brackets instead of just outside them.
-                let token = parsedDocument(for: textView.string).tokens
-                    .first { ($0.kind == .wikiLink || $0.kind == .link) && NSLocationInRange(charIndex, $0.range) }
                 let edgeFraction: CGFloat = 0.3
                 let frac = clickFractionThroughGlyph(textView, charIndex: charIndex)
                 if charIndex == linkRange.location, frac.map({ $0 <= edgeFraction }) ?? true {
-                    let caret = token?.range.location ?? linkRange.location          // before '[[' / '['
+                    let caret = clickedToken?.range.location ?? linkRange.location
                     textView.setSelectedRange(NSRange(location: caret, length: 0))
                     return true
                 }
                 if charIndex == NSMaxRange(linkRange) - 1, frac.map({ $0 >= 1 - edgeFraction }) ?? true {
-                    let caret = token.map { NSMaxRange($0.range) } ?? NSMaxRange(linkRange)  // after ']]' / ')'
+                    let caret = clickedToken.map { NSMaxRange($0.range) } ?? NSMaxRange(linkRange)
                     textView.setSelectedRange(NSRange(location: caret, length: 0))
                     return true
                 }

@@ -63,6 +63,7 @@ extension NativeTextViewCoordinator {
         ]
         textView.textStorage?.beginEditing()
         textView.textStorage?.removeAttribute(.link, range: fullRange)
+        textView.textStorage?.removeAttribute(.mutedLink, range: fullRange)
         textView.textStorage?.setAttributes(baseAttrs, range: fullRange)
 
         if rawMode {
@@ -78,6 +79,14 @@ extension NativeTextViewCoordinator {
                 selection: textView.selectedRange(),
                 in: nsDisplay,
                 suppressed: !textView.isEditable
+            )
+            // A document rebuild represents persisted content, not an in-progress
+            // `[[]]` draft. Keep every completed wiki link rendered and clickable.
+            removeAtomicWikiLinks(
+                from: &activeTokenIndices,
+                parsed: parsed,
+                in: textView,
+                treatingEveryWikiLinkAsAtomic: true
             )
 
             let ranges = MarkdownStyler.styleAttributes(
@@ -340,6 +349,11 @@ extension NativeTextViewCoordinator {
             selection: textView.selectedRange(),
             in: nsText,
             suppressed: !textView.isEditable
+        )
+        removeAtomicWikiLinks(
+            from: &activeTokenIndices,
+            parsed: parsed,
+            in: textView
         )
         restyleTextView(textView, paragraphCandidates: paragraphs, tokens: tokens,
                         classified: parsed.classified, blocks: parsed.blocks)

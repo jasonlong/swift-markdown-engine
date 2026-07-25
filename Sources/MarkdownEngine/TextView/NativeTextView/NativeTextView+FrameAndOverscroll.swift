@@ -69,6 +69,27 @@ extension NativeTextView {
         applyManagedFrameSize(width: frame.size.width)
     }
 
+    /// TextKit can settle a newly styled final paragraph one main-loop pass
+    /// after `textDidChange`, most visibly when list paragraph spacing moves the
+    /// final line below the height measured synchronously during the edit.
+    /// Re-measure once after that pass so a fit-content host never clips the
+    /// line to its stale frame. The flag coalesces multi-edit AppKit callbacks.
+    func scheduleFitContentRemeasure() {
+        guard configuration.heightBehavior == .fitsContent,
+              !pendingFitContentRemeasure else { return }
+        pendingFitContentRemeasure = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pendingFitContentRemeasure = false
+            guard self.configuration.heightBehavior == .fitsContent,
+                  let scrollView = self.enclosingScrollView else { return }
+            self.recalcOverscroll(
+                for: scrollView,
+                debugTag: "deferredFitContent"
+            )
+        }
+    }
+
     /// Shared policy evaluation, including the header band stacked above the text —
     /// without it, a short text under an expanded band gets no slack.
     private func resolvedOverscroll(
@@ -147,6 +168,24 @@ extension NativeTextView {
         }
 
         var rawHeight = max(segmentMaxY, fragmentMaxY)
+
+        // AppKit reports the final fragment's typographic bottom before its
+        // paragraph spacing, while the settled end segment includes that gap.
+        // A fit-content host can otherwise adopt the shorter value and clip the
+        // final line/caret against its document-view boundary.
+        if let storage = textStorage,
+           storage.length > 0,
+           !storage.mutableString.hasSuffix("\n"),
+           let paragraph = storage.attribute(
+               .paragraphStyle,
+               at: storage.length - 1,
+               effectiveRange: nil
+           ) as? NSParagraphStyle {
+            rawHeight = max(
+                rawHeight,
+                lastFragmentFrame.maxY + paragraph.paragraphSpacing
+            )
+        }
 
         // With a trailing "\n", the last line is TextKit's extra line fragment.
         // Its metrics follow the final newline's attributes — not the body style a

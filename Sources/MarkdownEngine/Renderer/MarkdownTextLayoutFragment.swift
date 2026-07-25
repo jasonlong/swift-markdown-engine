@@ -24,6 +24,10 @@ extension NSAttributedString.Key {
     /// Marks a bullet-list marker char (`-`/`*`/`+`) whose glyph is hidden so
     /// the fragment can paint a vector bullet in its place. Set to `true`.
     static let bulletMarker = NSAttributedString.Key("BulletListMarker")
+    /// Marks the source prefix occupied by an unordered-list affordance. The
+    /// fragment restores the editor canvas over this gutter range so bullets
+    /// and task checkboxes remain separate from selected item text.
+    static let listMarkerPrefix = NSAttributedString.Key("ListMarkerPrefix")
     /// Int indentation depth for subtle outliner ancestor guides.
     static let outlineDepth = NSAttributedString.Key("OutlineDepth")
     /// Marks a bullet that owns nested list-item descendants.
@@ -92,20 +96,24 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         // 3. Subtle ancestor guides for nested outline items
         drawOutlineGuides(at: point, in: context)
 
-        // 4. Normal text
+        // 4. Normal text.
         super.draw(at: point, in: context)
 
-        // 5. Task checkboxes (on top of hidden [ ]/[x] markers)
+        // 5. Keep list affordances outside TextKit's cross-line selection
+        // bands, then redraw the vector controls above the restored canvas.
+        drawSelectedListPrefixBackgrounds(at: point, in: context)
+
+        // 6. Task checkboxes (on top of hidden [ ]/[x] markers)
         drawTaskCheckboxes(at: point, in: context)
 
-        // 4b. Bullet glyphs (on top of hidden -/*/+ markers)
+        // 7. Bullet glyphs (on top of hidden -/*/+ markers)
         drawBulletMarkers(at: point, in: context)
 
-        // 5. Thematic breaks (full-width line, painted last so it doesn't
+        // 8. Thematic breaks (full-width line, painted last so it doesn't
         //    fight with anything that already drew at the line's center)
         drawThematicBreaks(at: point, in: context)
 
-        // 6. Blockquote bars (left gutter, behind nothing — text is indented)
+        // 9. Blockquote bars (left gutter, behind nothing — text is indented)
         drawBlockquoteBars(at: point, in: context)
     }
 
@@ -122,6 +130,75 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
     private var textStorage: NSTextStorage? {
         (textLayoutManager?.textContentManager as? NSTextContentStorage)?.textStorage
+    }
+
+    private func drawSelectedListPrefixBackgrounds(
+        at point: CGPoint,
+        in context: CGContext
+    ) {
+        let exclusions = selectedListPrefixRects(at: point)
+        guard !exclusions.isEmpty else { return }
+        let color = (
+            textLayoutManager?.textContainer?.textView as? NativeTextView
+        )?.configuration.theme.editorBackground ?? .textBackgroundColor
+        guard let fillColor = color.usingColorSpace(.deviceRGB)?.cgColor else {
+            return
+        }
+        context.setFillColor(fillColor)
+        for exclusion in exclusions where !exclusion.isEmpty {
+            context.fill(exclusion)
+        }
+    }
+
+    private func selectedListPrefixRects(at point: CGPoint) -> [CGRect] {
+        guard let textStorage,
+              let fragmentRange = fragmentNSRange,
+              let textLayoutManager,
+              let contentStorage = textLayoutManager.textContentManager
+                as? NSTextContentStorage,
+              let textView = textLayoutManager.textContainer?.textView else {
+            return []
+        }
+        let selections = textView.selectedRanges
+            .map(\.rangeValue)
+            .filter { $0.length > 0 }
+        guard !selections.isEmpty else { return [] }
+
+        let documentStart = contentStorage.documentRange.location
+        let dx = point.x - layoutFragmentFrame.origin.x
+        let dy = point.y - layoutFragmentFrame.origin.y
+        var result: [CGRect] = []
+
+        textStorage.enumerateAttribute(
+            .listMarkerPrefix,
+            in: fragmentRange,
+            options: []
+        ) { value, prefixRange, _ in
+            guard (value as? Bool) == true,
+                  selections.contains(where: {
+                      NSIntersectionRange($0, prefixRange).length > 0
+                  }),
+                  let start = contentStorage.location(
+                      documentStart,
+                      offsetBy: prefixRange.location
+                  ),
+                  let end = contentStorage.location(
+                      start,
+                      offsetBy: prefixRange.length
+                  ),
+                  let textRange = NSTextRange(location: start, end: end) else {
+                return
+            }
+            textLayoutManager.enumerateTextSegments(
+                in: textRange,
+                type: .selection,
+                options: []
+            ) { _, frame, _, _ in
+                result.append(frame.offsetBy(dx: dx, dy: dy))
+                return true
+            }
+        }
+        return result
     }
 
     /// Returns the drawing position for a character at `docIndex` (document-level NSRange location).
@@ -566,10 +643,6 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
     /// advance so a `•` of a different width still sits where `-`/`*`/`+` was.
     private func drawBulletMarkers(at point: CGPoint, in context: CGContext) {
         guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return }
-        let selectionRanges: [NSRange] = {
-            guard let tv = textLayoutManager?.textContainer?.textView else { return [] }
-            return tv.selectedRanges.map { $0.rangeValue }.filter { $0.length > 0 }
-        }()
 
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
@@ -578,7 +651,6 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
         let theme = (textLayoutManager?.textContainer?.textView as? NativeTextView)?
             .configuration.theme ?? .default
-        let storageString = ts.string as NSString
 
         ts.enumerateAttribute(.bulletMarker, in: range, options: []) { [weak self] value, attrRange, _ in
             guard let self, (value as? Bool) == true,
@@ -587,31 +659,13 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
             let font = (ts.attribute(.font, at: attrRange.location, effectiveRange: nil) as? NSFont)
                 ?? (self.textLayoutManager?.textContainer?.textView?.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize))
-            // A `.bulletMarker` range means the styler painted the raw char
-            // `.clear`, so something must ALWAYS be drawn over the slot. Outside
-            // a selection that's the rendered dot; while the marker sits inside
-            // a selection the raw source char (`-`/`*`/`+`) is painted instead,
-            // so selecting a list line reveals its raw syntax. (The styler's own
-            // reveal is caret-based and doesn't fire for selections — an earlier
-            // selection-skip here drew nothing over the cleared char, which left
-            // an empty slot wherever the selection anchor wasn't in the marker.)
-            let isSelected = selectionRanges.contains(where: { NSIntersectionRange($0, attrRange).length > 0 })
-            let raw = storageString.substring(with: attrRange)
-            let markerWidth = (raw as NSString).size(withAttributes: [.font: font]).width
-            if isSelected {
-                let glyph = raw as NSString
-                let glyphAttributes: [NSAttributedString.Key: Any] = [
-                    .font: font,
-                    .foregroundColor: theme.bodyText,
-                ]
-                let glyphWidth = glyph.size(withAttributes: glyphAttributes).width
-                let xOffset = max(0, (markerWidth - glyphWidth) / 2)
-                glyph.draw(
-                    at: CGPoint(x: pos.x + xOffset, y: pos.baselineY - font.ascender),
-                    withAttributes: glyphAttributes
-                )
-                return
-            }
+            // The raw marker is always clear and its source prefix is restored
+            // over selection drawing above, so the rendered dot remains a
+            // stable list affordance regardless of caret or selection state.
+            let raw = (ts.string as NSString).substring(with: attrRange)
+            let markerWidth = (raw as NSString).size(
+                withAttributes: [.font: font]
+            ).width
 
             let center = CGPoint(
                 x: pos.x + markerWidth / 2,
@@ -682,16 +736,17 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let style = configuration.taskCheckbox
             let font = textView?.baseFont
                 ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
-            let ascent = max(0, font.ascender)
-            let descent = max(0, -font.descender)
             let size = TaskCheckboxGeometry.size(for: font, scale: style.sizeScale)
             let boxX = TaskCheckboxGeometry.boxX(
                 contentX: pos.x,
                 size: size,
                 gap: style.contentGap
             )
-            let centerY = pos.baselineY + (descent - ascent) / 2
-            let boxY = centerY - size / 2
+            let boxY = TaskCheckboxGeometry.boxY(
+                baselineY: pos.baselineY,
+                font: font,
+                size: size
+            )
 
             let scale = textLayoutManager?.textContainer?.textView?.window?.backingScaleFactor
                 ?? NSScreen.main?.backingScaleFactor ?? 2.0

@@ -13,6 +13,7 @@ import Foundation
 extension NSAttributedString.Key {
     public static let wikiLinkID = NSAttributedString.Key("NodeLinkID")
     public static let taskCheckbox = NSAttributedString.Key("TaskCheckbox")
+    public static let mutedLink = NSAttributedString.Key("MutedLink")
 }
 
 enum MarkdownTokenKind: Equatable {

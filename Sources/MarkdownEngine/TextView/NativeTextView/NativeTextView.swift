@@ -23,6 +23,9 @@ final class NativeTextView: NSTextView {
     var isApplyingManagedFrameSize = false
     /// Set on switch/resize to force full-layout height measurement until the cascade settles.
     var pendingFullLayoutMeasure = false
+    /// Coalesces the post-edit fit-content remeasure that runs after TextKit
+    /// settles paragraph spacing on the next main-loop pass.
+    var pendingFitContentRemeasure = false
     /// Coalesces wide-table overlay updates to once per runloop (resize fires many per frame).
     var pendingWideTableOverlayUpdate = false
     var suppressAutoRevealOnce: Bool = false
@@ -46,6 +49,10 @@ final class NativeTextView: NSTextView {
 
     // MARK: Editor wiring
     var onPasteImage: ((NSPasteboard) -> String?)?
+    var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
+    var wikiLinkHoverTrackingArea: NSTrackingArea?
+    var hoveredWikiLinkRange: NSRange?
+    var hoveredWikiLinkTarget: String?
     weak var layoutBridge: LayoutBridge?
     var baseFont: NSFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
 

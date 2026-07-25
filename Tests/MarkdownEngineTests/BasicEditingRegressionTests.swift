@@ -6,6 +6,18 @@ import Testing
 @MainActor
 @Suite("Basic editing regressions", .serialized)
 struct BasicEditingRegressionTests {
+    private final class StorageEditRecorder: @unchecked Sendable {
+        var attributeEditRanges: [NSRange] = []
+
+        func record(_ notification: Notification) {
+            guard let storage = notification.object as? NSTextStorage,
+                  storage.editedMask.contains(.editedAttributes) else {
+                return
+            }
+            attributeEditRanges.append(storage.editedRange)
+        }
+    }
+
     private struct EditorStack {
         let scrollView: ClampedScrollView
         let container: NativeTextViewContainer
@@ -73,6 +85,19 @@ struct BasicEditingRegressionTests {
         )
     }
 
+    @Test("List controls center on the font's cap-height body")
+    func listControlsUseCapHeightCenter() {
+        let font = NSFont.systemFont(ofSize: 15)
+        let baselineY: CGFloat = 100
+
+        #expect(
+            BulletMarkerGeometry.centerY(
+                forBaseline: baselineY,
+                font: font
+            ) == baselineY - font.capHeight / 2
+        )
+    }
+
     @Test("Backspace at a plain line start joins the previous line")
     func backspaceJoinsPlainLines() {
         let stack = makeEditor(text: "first\nsecond")
@@ -126,6 +151,45 @@ struct BasicEditingRegressionTests {
         #expect(stack.textView.selectedRange() == NSRange(location: 5, length: 0))
     }
 
+    @Test("Typing task text does not restyle its checkbox prefix")
+    func typingTaskTextLeavesCheckboxPrefixRendered() throws {
+        let text = "- [ ] task"
+        let stack = makeEditor(text: text)
+        var configuration = stack.textView.configuration
+        configuration.taskCheckbox.showsListBullet = true
+        stack.textView.configuration = configuration
+        stack.coordinator.configuration = configuration
+        stack.coordinator.rebuildTextStorageAndStyle(stack.textView, from: text)
+
+        let storage = try #require(stack.textView.textStorage)
+        let recorder = StorageEditRecorder()
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification,
+            object: storage,
+            queue: nil
+        ) { notification in
+            recorder.record(notification)
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        stack.textView.setSelectedRange(
+            NSRange(location: (text as NSString).length, length: 0)
+        )
+        stack.textView.insertText(
+            "x",
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+
+        let checkboxPrefix = NSRange(location: 0, length: 5)
+        #expect(
+            recorder.attributeEditRanges.allSatisfy {
+                NSIntersectionRange($0, checkboxPrefix).length == 0
+            },
+            "Unchanged checkbox prefix was invalidated: \(recorder.attributeEditRanges)"
+        )
+        #expect(storage.attribute(.taskCheckbox, at: 2, effectiveRange: nil) != nil)
+    }
+
     @Test("Return grows a fit-content editor enough to show the new line")
     func returnGrowsFitContentEditor() {
         let stack = makeEditor(text: "first")
@@ -138,6 +202,54 @@ struct BasicEditingRegressionTests {
         #expect(stack.textView.string == "first\n")
         #expect(after > before)
         #expect(stack.textView.frame.height == after)
+    }
+
+    @Test("A fit-content editor remeasures after final-list-line layout settles")
+    func finalListLineRemainsVisibleAfterEditing() async throws {
+        let text = """
+            - [[Fickwood Plumbing]] came out and installed the garbage disposal but they couldn’t do the fridge water line because the shut-off valve to the house is ancient and will probably break if they turn it.
+            \t- We need to coordinate with the city to have them shut the water off at the street and have the plumbers come back and replace the shut-off valve. *Then* they can install the new water line.
+            - Making good progress on Nook. Editor mostly works now. Also backlinks and a page for all notes.
+            - Testing
+            """
+        let stack = makeEditor(text: text, fontName: "Geist-Regular", fontSize: 15)
+        var configuration = stack.textView.configuration
+        configuration.lists.firstLevelIndent = 0
+        configuration.lists.indentPerLevel = 32
+        configuration.lists.markerContentGap = 8
+        configuration.lists.nestedBlankLineHeightScale = 0.05
+        stack.textView.configuration = configuration
+        stack.coordinator.configuration = configuration
+        stack.coordinator.rebuildTextStorageAndStyle(stack.textView, from: text)
+        stack.textView.pendingFullLayoutMeasure = false
+        stack.textView.setSelectedRange(
+            NSRange(location: (stack.textView.string as NSString).length, length: 0)
+        )
+
+        stack.textView.insertText(
+            "x",
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+
+        #expect(stack.textView.pendingFitContentRemeasure)
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(!stack.textView.pendingFitContentRemeasure)
+
+        let textLayoutManager = try #require(stack.textView.textLayoutManager)
+        let documentEnd = textLayoutManager.documentRange.endLocation
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+        var finalSegmentMaxY: CGFloat = 0
+        textLayoutManager.enumerateTextSegments(
+            in: NSTextRange(location: documentEnd),
+            type: .standard,
+            options: []
+        ) { _, segmentFrame, _, _ in
+            finalSegmentMaxY = max(finalSegmentMaxY, segmentFrame.maxY)
+            return true
+        }
+
+        #expect(finalSegmentMaxY > 0)
+        #expect(stack.textView.frame.height >= finalSegmentMaxY)
     }
 
     @Test(

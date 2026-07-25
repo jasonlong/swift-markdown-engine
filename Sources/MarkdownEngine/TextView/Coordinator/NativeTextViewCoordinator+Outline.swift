@@ -55,6 +55,14 @@ extension NativeTextViewCoordinator {
         }
 
         let fullRange = NSRange(location: 0, length: storage.length)
+        if outlineAttributesMatch(
+            in: storage,
+            fullRange: fullRange,
+            items: items,
+            collapsedItems: resolved
+        ) {
+            return
+        }
         storage.beginEditing()
         storage.removeAttribute(.outlineDepth, range: fullRange)
         storage.removeAttribute(.outlineHasChildren, range: fullRange)
@@ -104,6 +112,74 @@ extension NativeTextViewCoordinator {
             )
         }
         storage.endEditing()
+    }
+
+    /// Ordinary edits move existing attributed ranges with their text. Avoid
+    /// clearing and rebuilding outline metadata across the whole document when
+    /// those ranges already describe the newly parsed outline exactly.
+    private func outlineAttributesMatch(
+        in storage: NSTextStorage,
+        fullRange: NSRange,
+        items: [OutlineListItem],
+        collapsedItems: [OutlineListItem]
+    ) -> Bool {
+        let expected = NSMutableAttributedString(string: storage.string)
+        for item in items {
+            expected.addAttribute(.outlineDepth, value: item.depth, range: item.markerRange)
+            if hasOutlineMarker(item), item.hasChildren {
+                expected.addAttribute(.outlineHasChildren, value: true, range: item.markerRange)
+            }
+        }
+        for item in collapsedItems {
+            expected.addAttribute(.outlineCollapsed, value: true, range: item.markerRange)
+            if let descendants = item.descendantRange {
+                expected.addAttribute(.outlineHidden, value: true, range: descendants)
+            }
+        }
+
+        let keys: [NSAttributedString.Key] = [
+            .outlineDepth,
+            .outlineHasChildren,
+            .outlineCollapsed,
+            .outlineHidden,
+        ]
+        for key in keys {
+            var location = 0
+            while location < fullRange.length {
+                var currentRange = NSRange()
+                let current = storage.attribute(
+                    key,
+                    at: location,
+                    longestEffectiveRange: &currentRange,
+                    in: fullRange
+                )
+                var expectedRange = NSRange()
+                let wanted = expected.attribute(
+                    key,
+                    at: location,
+                    longestEffectiveRange: &expectedRange,
+                    in: fullRange
+                )
+                if !outlineValuesEqual(current, wanted) {
+                    return false
+                }
+                let nextLocation = min(NSMaxRange(currentRange), NSMaxRange(expectedRange))
+                guard nextLocation > location else { return false }
+                location = nextLocation
+            }
+        }
+        return true
+    }
+
+    private func outlineValuesEqual(_ lhs: Any?, _ rhs: Any?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs as NSObject, rhs as NSObject):
+            return lhs.isEqual(rhs)
+        default:
+            return false
+        }
     }
 
     func redirectSelectionFromCollapsedOutline(in textView: NSTextView) -> Bool {
@@ -164,6 +240,19 @@ extension NativeTextViewCoordinator {
             textView.setSelectedRange(
                 NSRange(location: NSMaxRange(item.markerRange), length: 0)
             )
+        }
+        if !isCollapsing,
+           let descendants = item.descendantRange,
+           let storage = textView.textStorage {
+            // Incremental restyling deliberately preserves every attribute on
+            // hidden descendants so ordinary edits do not flash a collapsed
+            // subtree. Remove the presentation marker before restyling an
+            // expansion; otherwise the tiny transparent font/color runs are
+            // copied forward even after the collapsed state is gone.
+            storage.beginEditing()
+            storage.removeAttribute(.outlineHidden, range: descendants)
+            storage.removeAttribute(.outlineCollapsed, range: item.markerRange)
+            storage.endEditing()
         }
         let affectedRange = item.descendantRange.map {
             NSUnionRange(item.lineRange, $0)

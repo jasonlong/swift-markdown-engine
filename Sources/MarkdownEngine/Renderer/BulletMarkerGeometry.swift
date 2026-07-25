@@ -5,8 +5,11 @@ enum BulletMarkerGeometry {
         max(4.5, min(6, font.pointSize * 0.34))
     }
 
+    /// Visual center of the font's upright letter body. Cap height keeps
+    /// bullets and task controls aligned across families without a fixed
+    /// per-font offset.
     static func centerY(forBaseline baselineY: CGFloat, font: NSFont) -> CGFloat {
-        baselineY - font.xHeight / 2
+        baselineY - font.capHeight / 2
     }
 
     /// Baseline produced by TextKit for the fixed-height paragraph used by

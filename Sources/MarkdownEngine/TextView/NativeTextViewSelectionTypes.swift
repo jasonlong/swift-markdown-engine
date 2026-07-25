@@ -7,7 +7,27 @@
 //  Public selection / replacement value types exposed by NativeTextViewWrapper.
 //
 
-import Foundation
+import AppKit
+
+/// Geometry and target for the wiki link currently under the pointer.
+///
+/// The anchor rectangle is expressed in ``positioningView`` coordinates so
+/// an embedder can present native AppKit UI without translating out of the
+/// editor's nested scroll views.
+public struct WikiLinkHoverState {
+    /// Resolved opaque identifier, or the display name when no resolver exists.
+    public let target: String
+    /// The visible linked-text bounds in ``positioningView`` coordinates.
+    public let anchorRect: CGRect
+    /// View against which ``anchorRect`` is measured.
+    public let positioningView: NSView
+
+    public init(target: String, anchorRect: CGRect, positioningView: NSView) {
+        self.target = target
+        self.anchorRect = anchorRect
+        self.positioningView = positioningView
+    }
+}
 
 /// A range of text occupied by a wiki-link `[[Name]]`, in both the display
 /// and (where known) the storage coordinate systems.
