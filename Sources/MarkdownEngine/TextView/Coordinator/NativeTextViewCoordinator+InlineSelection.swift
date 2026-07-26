@@ -106,7 +106,8 @@ extension NativeTextViewCoordinator {
         while index >= lineStart {
             if index + 1 < selectionLocation,
                text.character(at: index) == 0x5B,
-               text.character(at: index + 1) == 0x5B {
+               text.character(at: index + 1) == 0x5B,
+               !isEscapedWikiOpening(at: index, in: text) {
                 let contentRange = NSRange(
                     location: index + 2,
                     length: selectionLocation - (index + 2)
@@ -131,6 +132,18 @@ extension NativeTextViewCoordinator {
         }
 
         return nil
+    }
+
+    /// Markdown treats an odd run of backslashes before `[[` as an escape.
+    /// Those literal brackets must never start the wiki-link create flow.
+    private func isEscapedWikiOpening(at location: Int, in text: NSString) -> Bool {
+        var slashCount = 0
+        var index = location - 1
+        while index >= 0, text.character(at: index) == 0x5C {
+            slashCount += 1
+            index -= 1
+        }
+        return slashCount.isMultiple(of: 2) == false
     }
 
     // MARK: - Image Embed Activation

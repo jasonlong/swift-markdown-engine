@@ -196,6 +196,73 @@ struct AtomicWikiLinkSelectionTests {
         #expect((editor.textView.string as NSString).substring(with: displayRange) == "[[Target")
     }
 
+    @Test("a draft ends exactly at the moved caret, preserving following text")
+    func draftUsesMovedCaretAsItsEnd() {
+        let editor = makeEditor(source: "Before work account after")
+        editor.textView.insertText("[[", replacementRange: NSRange(location: 7, length: 0))
+        editor.textView.setSelectedRange(NSRange(location: 21, length: 0))
+        let parsed = editor.coordinator.parsedDocument(for: editor.textView.string)
+
+        guard case .wikiLink(let token) = editor.coordinator.inlineTokenContext(
+            at: 21,
+            parsed: parsed,
+            codeTokens: parsed.codeTokens,
+            text: editor.textView.string as NSString
+        ) else {
+            Issue.record("Expected the moved caret to retain its draft")
+            return
+        }
+        #expect((editor.textView.string as NSString).substring(with: token.range) == "[[work account")
+        #expect(editor.textView.string == "Before [[work account after")
+    }
+
+    @Test("completed and escaped wiki syntax never become creation drafts")
+    func completedAndEscapedSyntaxDoNotBecomeDrafts() {
+        for source in ["[[hello world]]", #"\[[literal"#] {
+            let editor = makeEditor(source: source)
+            let location = (source as NSString).length
+            let parsed = editor.coordinator.parsedDocument(for: source)
+            #expect(editor.coordinator.inlineTokenContext(
+                at: location,
+                parsed: parsed,
+                codeTokens: parsed.codeTokens,
+                text: source as NSString
+            ) == nil)
+        }
+    }
+
+    @Test("inline-code wiki syntax never becomes a creation draft")
+    func inlineCodeSyntaxDoesNotBecomeDraft() {
+        let source = "`[[literal`"
+        let editor = makeEditor(source: source)
+        let parsed = editor.coordinator.parsedDocument(for: source)
+
+        #expect(editor.coordinator.inlineTokenContext(
+            at: (source as NSString).length,
+            parsed: parsed,
+            codeTokens: parsed.codeTokens,
+            text: source as NSString
+        ) == nil)
+    }
+
+    @Test("the nearest unfinished opener owns the current draft")
+    func nearestUnfinishedOpenerOwnsCurrentDraft() {
+        let source = "[[first [[second"
+        let editor = makeEditor(source: source)
+        let parsed = editor.coordinator.parsedDocument(for: source)
+
+        guard case .wikiLink(let token) = editor.coordinator.inlineTokenContext(
+            at: (source as NSString).length,
+            parsed: parsed,
+            codeTokens: parsed.codeTokens,
+            text: source as NSString
+        ) else {
+            Issue.record("Expected an unfinished draft")
+            return
+        }
+        #expect((source as NSString).substring(with: token.range) == "[[second")
+    }
+
     @Test("typing double opening brackets does not auto-pair them")
     func typedDoubleOpeningBracketsStayOpen() {
         let editor = makeEditor(source: "Before")
@@ -290,6 +357,57 @@ struct AtomicWikiLinkSelectionTests {
         await Task.yield()
 
         #expect(completion?.selection.placeholder == "[[Target]]")
+    }
+
+    @Test("closing a moved-caret draft creates only the chosen target span")
+    func closingBracketsLeaveFollowingTextOutsideTheLink() async {
+        let editor = makeEditor(source: "Before [[Target after")
+        var completions: [WikiLinkCompletion] = []
+        editor.coordinator.onWikiLinkCompletion = { completions.append($0) }
+        editor.textView.setSelectedRange(NSRange(location: 15, length: 0))
+
+        #expect(editor.coordinator.textView(
+            editor.textView,
+            shouldChangeTextIn: NSRange(location: 15, length: 0),
+            replacementString: "]]"
+        ))
+        editor.textView.textStorage?.replaceCharacters(
+            in: NSRange(location: 15, length: 0),
+            with: "]]"
+        )
+        editor.textView.setSelectedRange(NSRange(location: 17, length: 0))
+        editor.textView.didChangeText()
+        await Task.yield()
+
+        #expect(editor.textView.string == "Before [[Target]] after")
+        #expect(completions.map(\.selection.placeholder) == ["[[Target]]"])
+
+        editor.textView.didChangeText()
+        await Task.yield()
+        #expect(completions.count == 1)
+    }
+
+    @Test("plain closing brackets do not announce a wiki-link completion")
+    func plainClosingBracketsDoNotCompleteWikiLink() async {
+        let editor = makeEditor(source: "Before")
+        var completion: WikiLinkCompletion?
+        editor.coordinator.onWikiLinkCompletion = { completion = $0 }
+        editor.textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        #expect(editor.coordinator.textView(
+            editor.textView,
+            shouldChangeTextIn: NSRange(location: 6, length: 0),
+            replacementString: "]]"
+        ))
+        editor.textView.textStorage?.replaceCharacters(
+            in: NSRange(location: 6, length: 0),
+            with: "]]"
+        )
+        editor.textView.setSelectedRange(NSRange(location: 8, length: 0))
+        editor.textView.didChangeText()
+        await Task.yield()
+
+        #expect(completion == nil)
     }
 
     @Test("Return outside a completed wiki link remains a newline")
