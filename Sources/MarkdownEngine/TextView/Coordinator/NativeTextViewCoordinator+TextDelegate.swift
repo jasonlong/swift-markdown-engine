@@ -594,8 +594,11 @@ extension NativeTextViewCoordinator {
             // its intended end is the normal way to choose the target span, so
             // it keeps completion visible even without a key event.
             let shouldShowInlinePreview =
+                // The create/search menu belongs to an unfinished `[[Name`
+                // draft. A completed `[[Name]]` remains an ordinary atomic
+                // link while its caret is moved through for editing.
                 (inlineContext.selectionKind == .wikiLink
-                    && (isTyping || inlineContext.token.markerRanges.count == 1))
+                    && inlineContext.token.markerRanges.count == 1)
                 || (inlineContext.selectionKind == .imageEmbed && imageEmbedShowsInlinePreview)
             if shouldShowInlinePreview, let previewRect {
                 let selection = WikiLinkSelection(
