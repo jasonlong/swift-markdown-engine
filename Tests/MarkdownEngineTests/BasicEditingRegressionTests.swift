@@ -137,16 +137,24 @@ struct BasicEditingRegressionTests {
         #expect(stack.textView.selectedRange() == NSRange(location: 0, length: 0))
     }
 
-    @Test("Backspace at a task item start joins and removes task syntax")
-    func backspaceJoinsTaskItem() {
+    @Test("Backspace at a task item start demotes the task to a plain bullet")
+    func backspaceDemotesTaskItem() {
         let stack = makeEditor(text: "first\n- [ ] second")
         stack.textView.setSelectedRange(NSRange(location: 12, length: 0))
 
+        // First Backspace removes only the `[ ] ` checkbox, keeping the bullet.
         #expect(stack.coordinator.textView(
             stack.textView,
             doCommandBy: #selector(NSResponder.deleteBackward(_:))
         ))
+        #expect(stack.textView.string == "first\n- second")
+        #expect(stack.textView.selectedRange() == NSRange(location: 8, length: 0))
 
+        // A second Backspace removes the bare bullet and joins the previous line.
+        #expect(stack.coordinator.textView(
+            stack.textView,
+            doCommandBy: #selector(NSResponder.deleteBackward(_:))
+        ))
         #expect(stack.textView.string == "firstsecond")
         #expect(stack.textView.selectedRange() == NSRange(location: 5, length: 0))
     }

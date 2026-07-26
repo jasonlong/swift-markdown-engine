@@ -16,6 +16,24 @@ extension NativeTextViewCoordinator {
             return false
         }
 
+        // Task item: Backspace from the content start demotes the task to a
+        // plain bullet — remove just the `[ ] ` checkbox and keep the bullet
+        // marker — rather than deleting the whole prefix and joining the
+        // previous line. A second Backspace then removes the bare bullet.
+        if let demotionRange = MarkdownStyler.taskCheckboxDemotionRange(
+            at: selection.location - 1,
+            in: textView.string
+        ) {
+            let originalLength = (textView.string as NSString).length
+            MarkdownLists.performEdit(textView, replace: demotionRange, with: "")
+            guard (textView.string as NSString).length
+                == originalLength - demotionRange.length else {
+                return false
+            }
+            textView.setSelectedRange(NSRange(location: demotionRange.location, length: 0))
+            return true
+        }
+
         let nsText = textView.string as NSString
         let originalLength = nsText.length
         let joinsPreviousLine = protectedRange.location > 0

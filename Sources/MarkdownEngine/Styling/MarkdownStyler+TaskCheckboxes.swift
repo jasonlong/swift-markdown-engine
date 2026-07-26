@@ -62,6 +62,27 @@ extension MarkdownStyler {
         return NSLocationInRange(location, protectedRange) ? protectedRange : nil
     }
 
+    /// For a task line, the range covering the checkbox and its trailing
+    /// whitespace (`[ ] `) but NOT the leading `<indent><marker><spacer>`.
+    /// Removing it demotes the task to a plain bullet while keeping the
+    /// bullet marker. Returns nil for non-task list items.
+    static func taskCheckboxDemotionRange(at location: Int, in text: String) -> NSRange? {
+        let nsText = text as NSString
+        guard let (lineRange, match) = taskMatch(at: location, in: text) else { return nil }
+        let checkboxLineRange = match.range(at: 4)
+        guard checkboxLineRange.location != NSNotFound else { return nil }
+        let checkboxStart = lineRange.location + checkboxLineRange.location
+        var contentStart = lineRange.location + NSMaxRange(checkboxLineRange)
+        let lineEnd = NSMaxRange(lineRange)
+        while contentStart < lineEnd {
+            let character = nsText.character(at: contentStart)
+            guard character == 0x20 || character == 0x09 else { break }
+            contentStart += 1
+        }
+        guard checkboxStart < contentStart else { return nil }
+        return NSRange(location: checkboxStart, length: contentStart - checkboxStart)
+    }
+
     private static func taskMatch(
         at location: Int,
         in text: String
