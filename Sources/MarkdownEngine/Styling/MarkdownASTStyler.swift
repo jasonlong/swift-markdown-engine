@@ -499,7 +499,9 @@ enum MarkdownASTStyler {
             let headingBase = NSFont(name: ctx.fontName, size: ctx.baseFont.pointSize * multiplier)
                 ?? .systemFont(ofSize: ctx.baseFont.pointSize * multiplier)
             let headingFont = applying(weight: ctx.config.headings.fontWeight, to: headingBase)
-            let lineHeight = ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
+            let lineHeight = ctx.config.headings.lineHeightMultiplier(for: level)
+                .map { ceil(headingFont.pointSize * $0) }
+                ?? ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
             let headingPara = NSMutableParagraphStyle()
             headingPara.minimumLineHeight = lineHeight
             headingPara.maximumLineHeight = lineHeight

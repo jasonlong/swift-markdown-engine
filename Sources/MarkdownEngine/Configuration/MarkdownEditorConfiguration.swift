@@ -404,6 +404,9 @@ public struct TaskCheckboxStyle: Sendable {
 public struct HeadingStyle: Sendable {
     /// Font-size multiplier per heading level (1...6).
     public var fontMultipliers: [CGFloat]
+    /// Line-height multiplier per heading level (1...6). `nil` preserves the
+    /// platform's natural heading line height.
+    public var lineHeightMultipliers: [CGFloat]?
     /// Top spacing in `em` units per heading level (1...6).
     public var topSpacingEm: [CGFloat]
     /// Spacing after a heading, in points. `nil` uses the document's normal
@@ -417,12 +420,14 @@ public struct HeadingStyle: Sendable {
 
     public init(
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
+        lineHeightMultipliers: [CGFloat]? = nil,
         topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
         bottomSpacing: CGFloat? = nil,
         trailingBlankLineHeightScale: CGFloat? = nil,
         fontWeight: NSFont.Weight = .bold
     ) {
         self.fontMultipliers = fontMultipliers
+        self.lineHeightMultipliers = lineHeightMultipliers
         self.topSpacingEm = topSpacingEm
         self.bottomSpacing = bottomSpacing
         self.trailingBlankLineHeightScale = trailingBlankLineHeightScale
@@ -432,6 +437,12 @@ public struct HeadingStyle: Sendable {
     public func fontMultiplier(for level: Int) -> CGFloat {
         let index = max(1, min(level, fontMultipliers.count)) - 1
         return fontMultipliers[index]
+    }
+
+    public func lineHeightMultiplier(for level: Int) -> CGFloat? {
+        guard let lineHeightMultipliers else { return nil }
+        let index = max(1, min(level, lineHeightMultipliers.count)) - 1
+        return lineHeightMultipliers[index]
     }
 
     public func topSpacingEm(for level: Int) -> CGFloat {
