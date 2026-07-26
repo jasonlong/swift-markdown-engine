@@ -72,6 +72,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     /// default menu + current selection range, returns the menu to show.
     var onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)?
     var onInlineSelectionChange: ((InlineSelectionState?) -> Void)?
+    var onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)?
     var onInlinePreviewKey: ((InlinePreviewKey) -> Bool)?
     var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
     var didInitialFormatting: Bool = false
@@ -104,6 +105,9 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     /// extension block fence — captured in shouldChangeTextIn so a DELETED
     /// fence still forces the full restyle in textDidChange.
     var pendingExtFenceTouched = false
+    /// Set before an ordinary `]]` input; resolved against the post-edit parse
+    /// in `textDidChange` so only an actual completed wiki-link is reported.
+    var pendingWikiLinkCompletionRange: NSRange?
     /// Set when the storage mutated without the census bookkeeping seeing it
     /// (IME composition) — forces the next census back to a full scan.
     var backtickCensusNeedsRescan = false
@@ -256,7 +260,8 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
          fontSize: CGFloat,
          isWikiLinkActive: Binding<Bool>,
          onLinkClick: ((String) -> Void)?,
-         onInlineSelectionChange: ((InlineSelectionState?) -> Void)?) {
+         onInlineSelectionChange: ((InlineSelectionState?) -> Void)?,
+         onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)? = nil) {
         _text = text
         self.fontName = fontName
         self.fontSize = fontSize
@@ -264,6 +269,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
         self.onLinkClick = onLinkClick
         self.onCaretRectChange = nil
         self.onInlineSelectionChange = onInlineSelectionChange
+        self.onWikiLinkCompletion = onWikiLinkCompletion
         self.lastSyncedText = text.wrappedValue
         super.init()
         // Init + didSet share this helper so the observer tracks whichever service is current.
@@ -455,4 +461,3 @@ extension NSTextView {
         return boundingRect
     }
 }
-
