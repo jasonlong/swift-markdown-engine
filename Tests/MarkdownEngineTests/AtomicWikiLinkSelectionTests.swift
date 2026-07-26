@@ -230,6 +230,18 @@ struct AtomicWikiLinkSelectionTests {
         #expect(editor.textView.string == "Before[[")
     }
 
+    @Test("an AppKit-generated square-bracket companion is removed")
+    func removesGeneratedSquareBracketCompanion() {
+        let editor = makeEditor(source: "Before[]")
+        editor.coordinator.pendingOpeningSquareBracketLocation = 6
+        editor.textView.setSelectedRange(NSRange(location: 7, length: 0))
+
+        editor.textView.didChangeText()
+
+        #expect(editor.textView.string == "Before[")
+        #expect(editor.textView.selectedRange() == NSRange(location: 7, length: 0))
+    }
+
     @Test("typing an opening bracket wraps a text selection in an editable link")
     func openingBracketWrapsSelection() {
         let editor = makeEditor(source: "Before target after")

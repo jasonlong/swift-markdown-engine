@@ -115,6 +115,24 @@ extension NativeTextViewCoordinator {
         previousSelectedRange = safeSelRange
         PerfTrace.begin(docLength: fullLength)
 
+        // Some AppKit input paths pair `[` as `[]` after the edit delegate
+        // returns. Preserve the literal opening marker needed for `[[` drafts.
+        if let opening = pendingOpeningSquareBracketLocation {
+            pendingOpeningSquareBracketLocation = nil
+            if opening >= 0, opening + 1 < fullLength,
+               fullText.character(at: opening) == 0x5B,
+               fullText.character(at: opening + 1) == 0x5D {
+                isProgrammaticEdit = true
+                defer { isProgrammaticEdit = false }
+                let closing = NSRange(location: opening + 1, length: 1)
+                guard tv.shouldChangeText(in: closing, replacementString: "") else { return }
+                tv.textStorage?.replaceCharacters(in: closing, with: "")
+                tv.setSelectedRange(NSRange(location: opening + 1, length: 0))
+                tv.didChangeText()
+                return
+            }
+        }
+
         // Edit descriptor, hoisted above the wiki sync so both it and the
         // paragraph scoping below share it.
         let editedRange = pendingEditedRange ?? tv.textStorage?.editedRange ?? safeSelRange
@@ -680,6 +698,11 @@ extension NativeTextViewCoordinator {
             : nil
 
         pendingWikiLinkCompletionRange = nil
+        pendingOpeningSquareBracketLocation = interactive
+            && affectedCharRange.length == 0
+            && replacementString == "["
+            ? affectedCharRange.location
+            : nil
         if interactive,
            affectedCharRange.length == 0,
            replacementString == "]]" {

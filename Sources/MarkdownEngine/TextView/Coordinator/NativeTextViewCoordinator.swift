@@ -108,6 +108,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     /// Set before an ordinary `]]` input; resolved against the post-edit parse
     /// in `textDidChange` so only an actual completed wiki-link is reported.
     var pendingWikiLinkCompletionRange: NSRange?
+    var pendingOpeningSquareBracketLocation: Int?
     /// Set when the storage mutated without the census bookkeeping seeing it
     /// (IME composition) — forces the next census back to a full scan.
     var backtickCensusNeedsRescan = false
