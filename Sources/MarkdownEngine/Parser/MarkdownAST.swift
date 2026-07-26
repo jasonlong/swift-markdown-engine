@@ -58,6 +58,11 @@ indirect enum BlockNode: Equatable {
             return node.range
         }
     }
+
+    var isHeading: Bool {
+        if case .heading = self { return true }
+        return false
+    }
 }
 
 enum DocumentAST {

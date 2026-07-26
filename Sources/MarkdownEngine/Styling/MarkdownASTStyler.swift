@@ -87,8 +87,16 @@ enum MarkdownASTStyler {
         let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: parsedBlocks,
                                        registry: configuration.extensionRegistry)
         var attrs: [StyledRange] = []
-        for block in blocks where ctx.inScope(block.range) {
-            styleBlock(block, font: baseFont, ctx: ctx, into: &attrs)
+        for (index, block) in blocks.enumerated() where ctx.inScope(block.range) {
+            let followsHeading = index > 0
+                && blocks[index - 1].isHeading
+            styleBlock(
+                block,
+                font: baseFont,
+                ctx: ctx,
+                followsHeading: followsHeading,
+                into: &attrs
+            )
         }
         shrinkInactiveMarkers(in: blocks, ctx: ctx, into: &attrs)
 
@@ -475,7 +483,13 @@ enum MarkdownASTStyler {
 
     // MARK: - Blocks
 
-    private static func styleBlock(_ block: BlockNode, font: NSFont, ctx: Ctx, into attrs: inout [StyledRange]) {
+    private static func styleBlock(
+        _ block: BlockNode,
+        font: NSFont,
+        ctx: Ctx,
+        followsHeading: Bool,
+        into attrs: inout [StyledRange]
+    ) {
         switch block {
         case .paragraph(_, let inlines):
             styleInlines(inlines, font: font, ctx: ctx, into: &attrs)
@@ -516,16 +530,29 @@ enum MarkdownASTStyler {
         case .ext(let node):
             styleExtensionBlock(node, font: font, ctx: ctx, into: &attrs)
         case .blank(let range):
-            styleBlankLine(range: range, ctx: ctx, into: &attrs)
+            styleBlankLine(
+                range: range,
+                ctx: ctx,
+                overrideScale: followsHeading
+                    ? ctx.config.headings.trailingBlankLineHeightScale
+                    : nil,
+                into: &attrs
+            )
         case .blockLatex, .table:
             break   // NSImage rendering ported next
         }
     }
 
-    private static func styleBlankLine(range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]) {
-        let scale = ctx.nestedListBlankLocations.contains(range.location)
-            ? ctx.config.lists.nestedBlankLineHeightScale
-            : ctx.config.paragraph.blankLineHeightScale
+    private static func styleBlankLine(
+        range: NSRange,
+        ctx: Ctx,
+        overrideScale: CGFloat?,
+        into attrs: inout [StyledRange]
+    ) {
+        let scale = overrideScale
+            ?? (ctx.nestedListBlankLocations.contains(range.location)
+                ? ctx.config.lists.nestedBlankLineHeightScale
+                : ctx.config.paragraph.blankLineHeightScale)
         guard scale != 1 else { return }
         let lineHeight = max(
             1,

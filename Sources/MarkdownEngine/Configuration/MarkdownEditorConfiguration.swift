@@ -409,6 +409,9 @@ public struct HeadingStyle: Sendable {
     /// Spacing after a heading, in points. `nil` uses the document's normal
     /// paragraph spacing.
     public var bottomSpacing: CGFloat?
+    /// Height of a source blank line immediately following a heading. `nil`
+    /// uses the document's normal blank-line height.
+    public var trailingBlankLineHeightScale: CGFloat?
     /// Font weight shared by all heading levels.
     public var fontWeight: NSFont.Weight
 
@@ -416,11 +419,13 @@ public struct HeadingStyle: Sendable {
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
         topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
         bottomSpacing: CGFloat? = nil,
+        trailingBlankLineHeightScale: CGFloat? = nil,
         fontWeight: NSFont.Weight = .bold
     ) {
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
         self.bottomSpacing = bottomSpacing
+        self.trailingBlankLineHeightScale = trailingBlankLineHeightScale
         self.fontWeight = fontWeight
     }
 
