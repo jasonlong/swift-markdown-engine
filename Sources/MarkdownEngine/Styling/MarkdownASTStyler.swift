@@ -394,10 +394,14 @@ enum MarkdownASTStyler {
                 guard let match, let url = match.url,
                       !isInCode(match.range, codeRanges),
                       !isInCode(match.range, linkRanges) else { return }
-                attrs.append((match.range, [
+                var linkAttributes: [NSAttributedString.Key: Any] = [
                     .link: url,
                     .foregroundColor: ctx.theme.link,
-                ]))
+                ]
+                if let underlineStyle = ctx.config.link.externalUnderlineStyle {
+                    linkAttributes[.underlineStyle] = underlineStyle
+                }
+                attrs.append((match.range, linkAttributes))
             }
         }
     }
@@ -771,11 +775,13 @@ enum MarkdownASTStyler {
                     .foregroundColor: ctx.theme.link.withAlphaComponent(ctx.config.link.activeLinkAlpha),
                 ]))
             } else {
-                attrs.append((textRange, [
+                var linkAttributes: [NSAttributedString.Key: Any] = [
                     .link: url,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
                     .foregroundColor: ctx.theme.link,
-                ]))
+                ]
+                linkAttributes[.underlineStyle] =
+                    ctx.config.link.externalUnderlineStyle ?? NSUnderlineStyle.single.rawValue
+                attrs.append((textRange, linkAttributes))
             }
         }
         for marker in markers { attrs.append((marker, [.foregroundColor: ctx.theme.mutedText])) }

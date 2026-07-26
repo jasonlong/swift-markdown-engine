@@ -238,6 +238,33 @@ struct MarkdownASTStylerTests {
         )
     }
 
+    @Test("external links can use a dotted underline without affecting wiki links")
+    func externalLinksUseConfiguredUnderline() {
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.services.wikiLinks = ExistingWikiLinkResolver()
+        configuration.link.externalUnderlineStyle =
+            NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue
+        let text = "[[Linked note]] [web](https://example.com) https://swift.org"
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+
+        func underline(at position: Int) -> Int? {
+            attrs.reversed().first {
+                NSLocationInRange(position, $0.range) && $0.attributes[.underlineStyle] != nil
+            }?.attributes[.underlineStyle] as? Int
+        }
+
+        let expected = NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue
+        let ns = text as NSString
+        #expect(underline(at: ns.range(of: "Linked note").location) == nil)
+        #expect(underline(at: ns.range(of: "web").location) == expected)
+        #expect(underline(at: ns.range(of: "https://swift.org").location) == expected)
+    }
+
     /// Effective color at `pos`: the last styled range covering it that sets `.foregroundColor`.
     private func color(in attrs: [StyledRange], at pos: Int) -> NSColor? {
         var result: NSColor?

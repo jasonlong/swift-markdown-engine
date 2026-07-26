@@ -549,10 +549,18 @@ public struct LinkStyle: Sendable {
     /// Foreground alpha applied to "incomplete" link content (e.g. `[text]`
     /// without a target).
     public var incompleteLinkAlpha: CGFloat
+    /// Optional AppKit underline style applied to external Markdown links and
+    /// detected bare URLs. Wiki links deliberately do not receive this style.
+    public var externalUnderlineStyle: Int?
 
-    public init(activeLinkAlpha: CGFloat = 0.55, incompleteLinkAlpha: CGFloat = 0.7) {
+    public init(
+        activeLinkAlpha: CGFloat = 0.55,
+        incompleteLinkAlpha: CGFloat = 0.7,
+        externalUnderlineStyle: Int? = nil
+    ) {
         self.activeLinkAlpha = activeLinkAlpha
         self.incompleteLinkAlpha = incompleteLinkAlpha
+        self.externalUnderlineStyle = externalUnderlineStyle
     }
 
     public static let `default` = LinkStyle()
