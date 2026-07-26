@@ -29,7 +29,8 @@ struct AtomicWikiLinkSelectionTests {
 
     private func makeEditor(
         source: String = "Before [[Note|note-id]] after",
-        completedTaskTextColor: NSColor? = nil
+        completedTaskTextColor: NSColor? = nil,
+        isWikiLinkActive: Binding<Bool> = .constant(false)
     ) -> Editor {
         _ = NSApplication.shared
         let navigation = NavigationRecorder()
@@ -37,7 +38,7 @@ struct AtomicWikiLinkSelectionTests {
             text: .constant(source),
             fontName: "SF Pro",
             fontSize: 16,
-            isWikiLinkActive: .constant(false),
+            isWikiLinkActive: isWikiLinkActive,
             onLinkClick: { navigation.target = $0 },
             onInlineSelectionChange: nil
         )
@@ -289,6 +290,31 @@ struct AtomicWikiLinkSelectionTests {
         await Task.yield()
 
         #expect(completion?.selection.placeholder == "[[Target]]")
+    }
+
+    @Test("Return outside a completed wiki link remains a newline")
+    func returnOutsideCompletedWikiLinkIsNotCapturedByCompletion() {
+        var isWikiLinkActive = true
+        let editor = makeEditor(
+            source: "[[hello world]]",
+            isWikiLinkActive: Binding(
+                get: { isWikiLinkActive },
+                set: { isWikiLinkActive = $0 }
+            )
+        )
+        var handledKeys: [InlinePreviewKey] = []
+        editor.coordinator.onInlinePreviewKey = {
+            handledKeys.append($0)
+            return true
+        }
+        editor.textView.setSelectedRange(NSRange(location: 15, length: 0))
+
+        #expect(!editor.coordinator.textView(
+            editor.textView,
+            doCommandBy: #selector(NSResponder.insertNewline(_:))
+        ))
+        #expect(handledKeys.isEmpty)
+        #expect(!isWikiLinkActive)
     }
 
     @Test("editable links use a pointing-hand cursor")

@@ -102,31 +102,32 @@ extension NativeTextViewCoordinator {
         // untouched when the completion is applied.
         let lineRange = text.lineRange(for: NSRange(location: selectionLocation, length: 0))
         let lineStart = lineRange.location
-        var openingLocation: Int?
         var index = max(lineStart, selectionLocation - 2)
         while index >= lineStart {
             if index + 1 < selectionLocation,
                text.character(at: index) == 0x5B,
                text.character(at: index + 1) == 0x5B {
-                openingLocation = index
-                break
+                let contentRange = NSRange(
+                    location: index + 2,
+                    length: selectionLocation - (index + 2)
+                )
+                // A completed link is not a draft merely because the caret is
+                // now immediately after it. Continue scanning in case an
+                // earlier, genuinely unfinished `[[` begins this line.
+                if text.substring(with: contentRange).range(of: "]]", options: .backwards) == nil {
+                    let range = NSRange(location: index, length: selectionLocation - index)
+                    guard !MarkdownDetection.isInsideCodeBlock(range: range, codeTokens: codeTokens) else {
+                        return nil
+                    }
+                    return .wikiLink(token: MarkdownToken(
+                        kind: .wikiLink,
+                        range: range,
+                        contentRange: contentRange,
+                        markerRanges: [NSRange(location: index, length: 2)]
+                    ))
+                }
             }
             index -= 1
-        }
-        if let openingLocation {
-            let range = NSRange(location: openingLocation, length: selectionLocation - openingLocation)
-            guard !MarkdownDetection.isInsideCodeBlock(range: range, codeTokens: codeTokens) else {
-                return nil
-            }
-            return .wikiLink(token: MarkdownToken(
-                kind: .wikiLink,
-                range: range,
-                contentRange: NSRange(
-                    location: openingLocation + 2,
-                    length: selectionLocation - (openingLocation + 2)
-                ),
-                markerRanges: [NSRange(location: openingLocation, length: 2)]
-            ))
         }
 
         return nil

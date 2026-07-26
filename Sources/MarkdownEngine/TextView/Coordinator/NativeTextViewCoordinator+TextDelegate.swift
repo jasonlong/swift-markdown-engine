@@ -816,6 +816,23 @@ extension NativeTextViewCoordinator {
         // While an inline [[…]] / ![[…]] preview is open, route ↑/↓/Enter/Esc to the embedder's
         // autocomplete list (it returns true to consume the key; false → normal editor handling).
         if (isWikiLinkActive || isImageEmbedActive), let handler = onInlinePreviewKey {
+            // Creating a note can change the displayed draft into a completed
+            // link without another selection notification. Do not let that
+            // stale SwiftUI preview state consume Return once the caret has
+            // moved outside the link: Return must retain its editor meaning.
+            let text = textView.string
+            let parsed = parsedDocument(for: text)
+            guard inlineTokenContext(
+                at: textView.selectedRange().location,
+                parsed: parsed,
+                codeTokens: parsed.codeTokens,
+                text: text as NSString
+            ) != nil else {
+                isWikiLinkActive = false
+                isImageEmbedActive = false
+                onInlineSelectionChange?(nil)
+                return false
+            }
             let key: InlinePreviewKey?
             switch commandSelector {
             case #selector(NSResponder.moveUp(_:)): key = .moveUp
