@@ -290,6 +290,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = configuration.spellChecking.automaticSpellingCorrection
         textView.isContinuousSpellCheckingEnabled = configuration.spellChecking.continuousSpellChecking
         textView.isGrammarCheckingEnabled = configuration.spellChecking.grammarChecking
+        // Markdown owns `[[` as an unfinished wiki-link trigger. AppKit's
+        // automatic completion pairs the first `[` as `[]`, which prevents
+        // the user from choosing the link's end before closing it.
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticQuoteSubstitutionEnabled = true
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
