@@ -45,6 +45,12 @@ extension NativeTextViewCoordinator {
     func selectionDisplayRange(for token: MarkdownToken, openingMarkerLength: Int) -> NSRange {
         let leftRange = token.markerRanges.first
             ?? NSRange(location: token.range.location, length: min(openingMarkerLength, token.range.length))
+        guard token.markerRanges.count > 1 else {
+            return NSRange(
+                location: leftRange.location,
+                length: NSMaxRange(token.range) - leftRange.location
+            )
+        }
         let rightRange = token.markerRanges.last
             ?? NSRange(
                 location: max(token.range.location, NSMaxRange(token.range) - min(2, token.range.length)),
@@ -88,6 +94,39 @@ extension NativeTextViewCoordinator {
             guard selectionLocation >= start && selectionLocation <= end else { continue }
             guard !MarkdownDetection.isInsideCodeBlock(range: token.range, codeTokens: codeTokens) else { break }
             return .wikiLink(token: token)
+        }
+
+        // A wiki-link draft starts at `[[` and intentionally remains open
+        // until the user accepts autocomplete or types `]]`. Its editable
+        // range ends at the caret so text after the intended target remains
+        // untouched when the completion is applied.
+        let lineRange = text.lineRange(for: NSRange(location: selectionLocation, length: 0))
+        let lineStart = lineRange.location
+        var openingLocation: Int?
+        var index = max(lineStart, selectionLocation - 2)
+        while index >= lineStart {
+            if index + 1 < selectionLocation,
+               text.character(at: index) == 0x5B,
+               text.character(at: index + 1) == 0x5B {
+                openingLocation = index
+                break
+            }
+            index -= 1
+        }
+        if let openingLocation {
+            let range = NSRange(location: openingLocation, length: selectionLocation - openingLocation)
+            guard !MarkdownDetection.isInsideCodeBlock(range: range, codeTokens: codeTokens) else {
+                return nil
+            }
+            return .wikiLink(token: MarkdownToken(
+                kind: .wikiLink,
+                range: range,
+                contentRange: NSRange(
+                    location: openingLocation + 2,
+                    length: selectionLocation - (openingLocation + 2)
+                ),
+                markerRanges: [NSRange(location: openingLocation, length: 2)]
+            ))
         }
 
         return nil

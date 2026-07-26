@@ -571,11 +571,13 @@ extension NativeTextViewCoordinator {
             let previewRect = tv.viewRect(forCharacterRange: displayRange, using: layoutBridge)
                 ?? tv.viewRect(forCharacterRange: tv.selectedRange(), using: layoutBridge)
 
-            // Only autocomplete while TYPING — not when the caret merely lands in an existing link via
-            // a click (mirrors the image-embed gate). Clicking into a complete [[Name]] shouldn't pop
-            // the picker; typing a name does.
+            // A completed link should not pop a picker merely because its caret
+            // was reached. An unfinished `[[Name` draft is different: moving to
+            // its intended end is the normal way to choose the target span, so
+            // it keeps completion visible even without a key event.
             let shouldShowInlinePreview =
-                (inlineContext.selectionKind == .wikiLink && isTyping)
+                (inlineContext.selectionKind == .wikiLink
+                    && (isTyping || inlineContext.token.markerRanges.count == 1))
                 || (inlineContext.selectionKind == .imageEmbed && imageEmbedShowsInlinePreview)
             if shouldShowInlinePreview, let previewRect {
                 let selection = WikiLinkSelection(

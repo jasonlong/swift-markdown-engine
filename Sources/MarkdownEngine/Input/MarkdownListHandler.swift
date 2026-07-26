@@ -140,32 +140,11 @@ struct MarkdownLists {
             }
         }
 
-        // Autocomplete Obsidian-style node brackets and single square brackets
+        // `[[` starts a wiki-link draft. Do not auto-pair either square
+        // bracket: the user may put its opening marker before existing prose,
+        // move to the desired end, then pick a completion or type `]]`.
         if replacementString == "[" {
-            let nsText = textView.string as NSString
-            let insertionLocation = affectedCharRange.location
-            if insertionLocation > 0 {
-                let prevChar = nsText.substring(with: NSRange(location: insertionLocation - 1, length: 1))
-                if prevChar == "[" {
-                    let hasAutoCloseBracket = insertionLocation < nsText.length
-                        && nsText.substring(with: NSRange(location: insertionLocation, length: 1)) == "]"
-                    if hasAutoCloseBracket {
-                        // Collapse auto-paired "[]" into "[[]]" without changing surrounding text.
-                        MarkdownLists.performEdit(
-                            textView,
-                            replace: NSRange(location: insertionLocation - 1, length: 2),
-                            with: "[[]]"
-                        )
-                    } else {
-                        // If the char to the right is not "]" (e.g. newline), do not delete it.
-                        MarkdownLists.performEdit(textView, replace: affectedCharRange, with: "[]]")
-                    }
-                    textView.setSelectedRange(NSRange(location: insertionLocation + 1, length: 0))
-                    return false
-                }
-            }
-            guard autoClosePairsEnabled else { return true }
-            return insertAutoPair(open: "[", close: "]")
+            return true
         }
 
         // Autocomplete parentheses / braces

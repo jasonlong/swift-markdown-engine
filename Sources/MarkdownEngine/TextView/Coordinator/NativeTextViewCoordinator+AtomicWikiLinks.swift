@@ -1,13 +1,10 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
-    /// Handles the two natural wiki-link creation gestures before AppKit applies
-    /// its ordinary bracket insertion:
-    ///
-    /// * typing the second `[` inserts the closing `]]` and leaves the caret in
-    ///   the editable content;
-    /// * typing `[` over a text selection wraps it in `[[…]]` and leaves the
-    ///   caret at the end of that content so the same completion UI opens.
+    /// Typing `[` over a text selection begins a wiki-link draft around it.
+    /// The closing `]]` is deliberately not inserted: callers can move the
+    /// caret to choose the exact end of the target before accepting a row or
+    /// typing the closing markers themselves.
     ///
     /// The caller has already rejected raw-source, undo, and protected-prefix
     /// edits. Returning `true` means this method performed the replacement.
@@ -27,18 +24,11 @@ extension NativeTextViewCoordinator {
         }
 
         let selectedText = text.substring(with: affectedRange)
-        let replacement: String
-        let caretLocation: Int
-        if affectedRange.length > 0 {
-            replacement = "[[\(selectedText)]]"
-            caretLocation = affectedRange.location + 2 + (selectedText as NSString).length
-        } else if affectedRange.location > 0,
-                  text.character(at: affectedRange.location - 1) == 0x5B {
-            replacement = "[]]"
-            caretLocation = affectedRange.location + 1
-        } else {
+        guard affectedRange.length > 0 else {
             return false
         }
+        let replacement = "[[\(selectedText)"
+        let caretLocation = affectedRange.location + (replacement as NSString).length
 
         textView.breakUndoCoalescing()
         isProgrammaticEdit = true

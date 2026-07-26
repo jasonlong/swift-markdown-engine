@@ -167,18 +167,32 @@ struct AtomicWikiLinkSelectionTests {
         #expect(editor.textView.selectedRange() == NSRange(location: 2, length: 0))
     }
 
-    @Test("typing a second opening bracket creates an editable link pair")
-    func secondOpeningBracketCreatesPair() {
-        let editor = makeEditor(source: "Before [")
-        editor.textView.setSelectedRange(NSRange(location: 8, length: 0))
+    @Test("an unfinished wiki-link keeps completion open at its chosen end")
+    func unfinishedWikiLinkKeepsCompletionOpen() {
+        let editor = makeEditor(source: "Before [[Target")
+        editor.textView.setSelectedRange(NSRange(location: 15, length: 0))
 
-        #expect(!editor.coordinator.textView(
+        #expect(editor.coordinator.textView(
             editor.textView,
             shouldChangeTextIn: NSRange(location: 8, length: 0),
             replacementString: "["
         ))
-        #expect(editor.textView.string == "Before [[]]")
-        #expect(editor.textView.selectedRange() == NSRange(location: 9, length: 0))
+        let parsed = editor.coordinator.parsedDocument(for: editor.textView.string)
+        let context = editor.coordinator.inlineTokenContext(
+            at: 15,
+            parsed: parsed,
+            codeTokens: parsed.codeTokens,
+            text: editor.textView.string as NSString
+        )
+
+        #expect(editor.textView.string == "Before [[Target")
+        #expect(editor.textView.selectedRange() == NSRange(location: 15, length: 0))
+        guard case .wikiLink(let token) = context else {
+            Issue.record("Expected an unfinished wiki-link context")
+            return
+        }
+        let displayRange = editor.coordinator.selectionDisplayRange(for: token, openingMarkerLength: 2)
+        #expect((editor.textView.string as NSString).substring(with: displayRange) == "[[Target")
     }
 
     @Test("typing an opening bracket wraps a text selection in an editable link")
@@ -191,7 +205,7 @@ struct AtomicWikiLinkSelectionTests {
             shouldChangeTextIn: NSRange(location: 7, length: 6),
             replacementString: "["
         ))
-        #expect(editor.textView.string == "Before [[target]] after")
+        #expect(editor.textView.string == "Before [[target after")
         #expect(editor.textView.selectedRange() == NSRange(location: 15, length: 0))
     }
 
