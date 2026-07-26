@@ -406,16 +406,21 @@ public struct HeadingStyle: Sendable {
     public var fontMultipliers: [CGFloat]
     /// Top spacing in `em` units per heading level (1...6).
     public var topSpacingEm: [CGFloat]
+    /// Spacing after a heading, in points. `nil` uses the document's normal
+    /// paragraph spacing.
+    public var bottomSpacing: CGFloat?
     /// Font weight shared by all heading levels.
     public var fontWeight: NSFont.Weight
 
     public init(
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
         topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
+        bottomSpacing: CGFloat? = nil,
         fontWeight: NSFont.Weight = .bold
     ) {
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
+        self.bottomSpacing = bottomSpacing
         self.fontWeight = fontWeight
     }
 
