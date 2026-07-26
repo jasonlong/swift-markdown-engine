@@ -361,6 +361,8 @@ public struct TaskCheckboxStyle: Sendable {
     public var contentGap: CGFloat
     /// Optional fill tint for a checked symbol.
     public var checkedTint: NSColor?
+    /// Optional foreground tint for an unchecked symbol.
+    public var uncheckedTint: NSColor?
     /// Optional foreground color for checked task text.
     public var checkedTextColor: NSColor?
     /// Optional foreground color for links inside checked task text.
@@ -377,6 +379,7 @@ public struct TaskCheckboxStyle: Sendable {
         sizeScale: CGFloat = 1,
         contentGap: CGFloat = 2,
         checkedTint: NSColor? = nil,
+        uncheckedTint: NSColor? = nil,
         checkedTextColor: NSColor? = nil,
         checkedLinkColor: NSColor? = nil,
         strikesCheckedText: Bool = true,
@@ -388,6 +391,7 @@ public struct TaskCheckboxStyle: Sendable {
         self.sizeScale = sizeScale
         self.contentGap = contentGap
         self.checkedTint = checkedTint
+        self.uncheckedTint = uncheckedTint
         self.checkedTextColor = checkedTextColor
         self.checkedLinkColor = checkedLinkColor
         self.strikesCheckedText = strikesCheckedText

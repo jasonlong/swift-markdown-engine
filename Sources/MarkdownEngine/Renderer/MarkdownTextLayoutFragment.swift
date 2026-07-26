@@ -771,6 +771,11 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                         paletteColors: [.textBackgroundColor, checkedTint]
                     )
                     symbolConfig = sizeConfig.applying(colorConfig)
+                } else if !isChecked, let uncheckedTint = style.uncheckedTint {
+                    let colorConfig = NSImage.SymbolConfiguration(
+                        hierarchicalColor: uncheckedTint
+                    )
+                    symbolConfig = sizeConfig.applying(colorConfig)
                 } else if style.usesNativeSymbolRendering {
                     symbolConfig = sizeConfig
                 } else {
