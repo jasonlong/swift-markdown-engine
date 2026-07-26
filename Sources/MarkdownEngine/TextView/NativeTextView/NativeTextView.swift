@@ -93,6 +93,25 @@ final class NativeTextView: NSTextView {
     }
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        // AppKit's normal hardware-key path can pair `[` before the delegate
+        // sees the second bracket. Wiki links intentionally need an *open*
+        // `[[` draft, so perform this insertion ourselves and let the delegate
+        // decide whether a selected range should be wrapped.
+        let insertedText: String? = (insertString as? String)
+            ?? (insertString as? NSAttributedString)?.string
+        if insertedText == "[", !hasMarkedText(), !configuration.rawSourceMode {
+            let range = replacementRange.location == NSNotFound
+                ? selectedRange()
+                : replacementRange
+            guard shouldChangeText(in: range, replacementString: "[") else {
+                return
+            }
+            textStorage?.replaceCharacters(in: range, with: "[")
+            setSelectedRange(NSRange(location: range.location + 1, length: 0))
+            didChangeText()
+            return
+        }
+
         guard let prefix = emptyDocumentPrefix,
               !prefix.isEmpty,
               string.isEmpty else {
