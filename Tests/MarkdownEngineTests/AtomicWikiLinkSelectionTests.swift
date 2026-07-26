@@ -207,6 +207,18 @@ struct AtomicWikiLinkSelectionTests {
         #expect(editor.textView.selectedRange() == NSRange(location: 8, length: 0))
     }
 
+    @Test("a paired square-bracket insertion stays an open wiki-link marker")
+    func pairedOpeningBracketInsertionStaysOpen() {
+        let editor = makeEditor(source: "Before")
+        editor.textView.setSelectedRange(NSRange(location: 6, length: 0))
+
+        editor.textView.insertText("[]", replacementRange: editor.textView.selectedRange())
+        editor.textView.insertText("[]", replacementRange: editor.textView.selectedRange())
+
+        #expect(editor.textView.string == "Before[[")
+        #expect(editor.textView.selectedRange() == NSRange(location: 8, length: 0))
+    }
+
     @Test("physical opening-bracket keys bypass AppKit pairing")
     func physicalOpeningBracketKeysStayOpen() throws {
         let editor = makeEditor(source: "Before")

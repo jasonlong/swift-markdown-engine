@@ -99,10 +99,17 @@ final class NativeTextView: NSTextView {
         // decide whether a selected range should be wrapped.
         let insertedText: String? = (insertString as? String)
             ?? (insertString as? NSAttributedString)?.string
-        if insertedText == "[", !hasMarkedText(), !configuration.rawSourceMode {
-            let range = replacementRange.location == NSNotFound
-                ? selectedRange()
-                : replacementRange
+        // Certain input sources deliver AppKit's automatic pair as one
+        // insertion (`[]`) rather than delivering the opening bracket alone.
+        // Treat both forms as the literal `[` needed to begin a wiki-link
+        // draft. This intentionally does not affect pasted text because this
+        // override is only concerned with a zero-length interactive insertion.
+        let range = replacementRange.location == NSNotFound
+            ? selectedRange()
+            : replacementRange
+        if (insertedText == "[" || (insertedText == "[]" && range.length == 0)),
+           !hasMarkedText(),
+           !configuration.rawSourceMode {
             guard shouldChangeText(in: range, replacementString: "[") else {
                 return
             }
