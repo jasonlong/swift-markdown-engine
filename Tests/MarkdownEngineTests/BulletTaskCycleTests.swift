@@ -7,7 +7,8 @@ import Testing
 @Suite("Bullet task-state cycle")
 struct BulletTaskCycleTests {
     private func makeCoordinator(text: String) -> NativeTextViewCoordinator {
-        NativeTextViewCoordinator(
+        _ = NSApplication.shared
+        return NativeTextViewCoordinator(
             text: .constant(text),
             fontName: "SF Pro",
             fontSize: 16,
@@ -60,6 +61,19 @@ struct BulletTaskCycleTests {
 
         #expect(textView.cycleBulletTaskState())
         #expect(textView.string == "- item")
+        #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
+    }
+
+    @Test("command-return materializes a virtual starter bullet as a task")
+    func materializesVirtualStarterBullet() {
+        let textView = NativeTextView(frame: .zero)
+        let coordinator = makeCoordinator(text: textView.string)
+        textView.delegate = coordinator
+        textView.emptyDocumentPrefix = "- "
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+
+        #expect(textView.cycleBulletTaskState())
+        #expect(textView.string == "- [ ] ")
         #expect(textView.selectedRange() == NSRange(location: 6, length: 0))
     }
 

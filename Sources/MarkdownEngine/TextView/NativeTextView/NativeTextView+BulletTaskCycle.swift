@@ -4,11 +4,28 @@ extension NativeTextView {
     func cycleBulletTaskState() -> Bool {
         guard isEditable,
               let textStorage,
-              let coordinator = delegate as? NativeTextViewCoordinator,
-              let edit = BulletTaskCycle.edit(
+              let coordinator = delegate as? NativeTextViewCoordinator else { return false }
+
+        let edit: BulletTaskCycleEdit?
+        if textStorage.length == 0,
+           selectedRange() == NSRange(location: 0, length: 0),
+           let prefix = emptyDocumentPrefix,
+           ["- ", "+ ", "* "].contains(prefix) {
+            // The daily-note starter bullet is virtual until the first edit.
+            // Command-Return is an edit too: materialize it as an unchecked task
+            // rather than ignoring the shortcut because storage is still empty.
+            edit = BulletTaskCycleEdit(
+                range: NSRange(location: 0, length: 0),
+                replacement: prefix + "[ ] "
+            )
+        } else {
+            edit = BulletTaskCycle.edit(
                 in: textStorage.string,
                 at: selectedRange().location
-              ) else { return false }
+            )
+        }
+
+        guard let edit else { return false }
 
         let originalSelection = selectedRange()
         breakUndoCoalescing()
