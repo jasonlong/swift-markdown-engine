@@ -226,6 +226,23 @@ extension NativeTextViewCoordinator {
                 ? ParseEditDescriptor(editedRange: editedRange, delta: lengthDelta)
                 : nil)
         }
+        if let closingRange = pendingWikiLinkCompletionRange {
+            pendingWikiLinkCompletionRange = nil
+            if let token = parsed.wikiLinkTokens.first(where: {
+                $0.contentRange.length > 0
+                    && NSMaxRange($0.range) == NSMaxRange(closingRange)
+            }) {
+                let displayRange = selectionDisplayRange(for: token, openingMarkerLength: 2)
+                let selection = WikiLinkSelection(
+                    displayRange: displayRange,
+                    storageRange: storageRange(forDisplayRange: displayRange),
+                    placeholder: fullText.substring(with: displayRange)
+                )
+                DispatchQueue.main.async {
+                    self.onWikiLinkCompletion?(WikiLinkCompletion(selection: selection))
+                }
+            }
+        }
         let tokens = parsed.tokens
         let codeTokens = parsed.codeTokens
         let latexTokens = parsed.latexTokens
@@ -660,6 +677,16 @@ extension NativeTextViewCoordinator {
             ? PerfTrace.measure("preParse") { parsedDocument(for: preText) }
             : nil
 
+        pendingWikiLinkCompletionRange = nil
+        if interactive,
+           affectedCharRange.length == 0,
+           replacementString == "]]" {
+            pendingWikiLinkCompletionRange = NSRange(
+                location: affectedCharRange.location,
+                length: 2
+            )
+        }
+
         parseGeneration &+= 1
         // Refresh the descriptor for EVERY proposed edit — including programmatic
         // ones. A smart-input interceptor that suppresses a keystroke and performs
@@ -717,6 +744,16 @@ extension NativeTextViewCoordinator {
 
         defer { PerfTrace.checkpoint("shouldOut") }
         return PerfTrace.measure("smartInput") {
+            if handleWikiLinkCreationInput(
+                in: textView,
+                affectedRange: affectedCharRange,
+                replacementString: replacementString,
+                text: preNS,
+                codeTokens: parsed.codeTokens
+            ) {
+                return false
+            }
+
             // Block LaTeX auto-wrap: insert newlines to keep $$ on its own line
             if MarkdownInputHandler.handleBlockLatexAutoWrap(
                 textView: textView,

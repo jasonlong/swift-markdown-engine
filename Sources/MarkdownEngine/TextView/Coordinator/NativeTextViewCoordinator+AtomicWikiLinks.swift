@@ -1,6 +1,59 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
+    /// Handles the two natural wiki-link creation gestures before AppKit applies
+    /// its ordinary bracket insertion:
+    ///
+    /// * typing the second `[` inserts the closing `]]` and leaves the caret in
+    ///   the editable content;
+    /// * typing `[` over a text selection wraps it in `[[…]]` and leaves the
+    ///   caret at the end of that content so the same completion UI opens.
+    ///
+    /// The caller has already rejected raw-source, undo, and protected-prefix
+    /// edits. Returning `true` means this method performed the replacement.
+    func handleWikiLinkCreationInput(
+        in textView: NSTextView,
+        affectedRange: NSRange,
+        replacementString: String?,
+        text: NSString,
+        codeTokens: [MarkdownToken]
+    ) -> Bool {
+        guard replacementString == "[",
+              affectedRange.location != NSNotFound,
+              NSMaxRange(affectedRange) <= text.length,
+              !MarkdownDetection.isInsideCodeBlock(range: affectedRange, codeTokens: codeTokens)
+        else {
+            return false
+        }
+
+        let selectedText = text.substring(with: affectedRange)
+        let replacement: String
+        let caretLocation: Int
+        if affectedRange.length > 0 {
+            replacement = "[[\(selectedText)]]"
+            caretLocation = affectedRange.location + 2 + (selectedText as NSString).length
+        } else if affectedRange.location > 0,
+                  text.character(at: affectedRange.location - 1) == 0x5B {
+            replacement = "[]]"
+            caretLocation = affectedRange.location + 1
+        } else {
+            return false
+        }
+
+        textView.breakUndoCoalescing()
+        isProgrammaticEdit = true
+        defer { isProgrammaticEdit = false }
+        guard textView.shouldChangeText(in: affectedRange, replacementString: replacement) else {
+            return false
+        }
+        textView.textStorage?.replaceCharacters(in: affectedRange, with: replacement)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: caretLocation, length: 0))
+        textView.undoManager?.setActionName("Insert Link")
+        textView.breakUndoCoalescing()
+        return true
+    }
+
     /// Completed wiki links behave like atomic mentions. A draft `[[]]` has
     /// neither attribute, so it remains editable while autocomplete is active.
     func isAtomicWikiLink(_ token: MarkdownToken, in textView: NSTextView) -> Bool {

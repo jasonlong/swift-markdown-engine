@@ -167,6 +167,57 @@ struct AtomicWikiLinkSelectionTests {
         #expect(editor.textView.selectedRange() == NSRange(location: 2, length: 0))
     }
 
+    @Test("typing a second opening bracket creates an editable link pair")
+    func secondOpeningBracketCreatesPair() {
+        let editor = makeEditor(source: "Before [")
+        editor.textView.setSelectedRange(NSRange(location: 8, length: 0))
+
+        #expect(!editor.coordinator.textView(
+            editor.textView,
+            shouldChangeTextIn: NSRange(location: 8, length: 0),
+            replacementString: "["
+        ))
+        #expect(editor.textView.string == "Before [[]]")
+        #expect(editor.textView.selectedRange() == NSRange(location: 9, length: 0))
+    }
+
+    @Test("typing an opening bracket wraps a text selection in an editable link")
+    func openingBracketWrapsSelection() {
+        let editor = makeEditor(source: "Before target after")
+        editor.textView.setSelectedRange(NSRange(location: 7, length: 6))
+
+        #expect(!editor.coordinator.textView(
+            editor.textView,
+            shouldChangeTextIn: NSRange(location: 7, length: 6),
+            replacementString: "["
+        ))
+        #expect(editor.textView.string == "Before [[target]] after")
+        #expect(editor.textView.selectedRange() == NSRange(location: 15, length: 0))
+    }
+
+    @Test("typing closing brackets reports the completed wiki link")
+    func closingBracketsReportCompletion() async {
+        let editor = makeEditor(source: "Before [[Target")
+        var completion: WikiLinkCompletion?
+        editor.coordinator.onWikiLinkCompletion = { completion = $0 }
+        editor.textView.setSelectedRange(NSRange(location: 15, length: 0))
+
+        #expect(editor.coordinator.textView(
+            editor.textView,
+            shouldChangeTextIn: NSRange(location: 15, length: 0),
+            replacementString: "]]"
+        ))
+        editor.textView.textStorage?.replaceCharacters(
+            in: NSRange(location: 15, length: 0),
+            with: "]]"
+        )
+        editor.textView.setSelectedRange(NSRange(location: 17, length: 0))
+        editor.textView.didChangeText()
+        await Task.yield()
+
+        #expect(completion?.selection.placeholder == "[[Target]]")
+    }
+
     @Test("editable links use a pointing-hand cursor")
     func editableLinkCursor() throws {
         let editor = makeEditor()

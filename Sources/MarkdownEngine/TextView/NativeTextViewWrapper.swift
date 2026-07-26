@@ -93,6 +93,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Fires when the caret enters or leaves a `[[Name]]` or `![[…]]`
     /// token. `nil` means the caret is no longer inside such a token.
     public var onInlineSelectionChange: ((InlineSelectionState?) -> Void)?
+    /// Fires after the user types the closing `]]` of a wiki link. Unlike the
+    /// inline-selection callback, this remains useful after the caret has left
+    /// the link's editable content.
+    public var onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)?
     /// Fires on ↑/↓/Enter/Esc while an inline `[[…]]` preview is open, so the
     /// embedder can drive its autocomplete list. Return `true` to consume the key.
     public var onInlinePreviewKey: ((InlinePreviewKey) -> Bool)?
@@ -150,6 +154,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onCaretRectChange: ((CGRect) -> Void)? = nil,
         onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)? = nil,
         onInlineSelectionChange: ((InlineSelectionState?) -> Void)? = nil,
+        onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)? = nil,
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
@@ -175,6 +180,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onCaretRectChange = onCaretRectChange
         self.onBuildContextMenu = onBuildContextMenu
         self.onInlineSelectionChange = onInlineSelectionChange
+        self.onWikiLinkCompletion = onWikiLinkCompletion
         self.onInlinePreviewKey = onInlinePreviewKey
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
@@ -327,6 +333,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onCaretRectChange = onCaretRectChange
         context.coordinator.onBuildContextMenu = onBuildContextMenu
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
+        context.coordinator.onWikiLinkCompletion = onWikiLinkCompletion
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
 
@@ -635,6 +642,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onCaretRectChange = onCaretRectChange
         context.coordinator.onBuildContextMenu = onBuildContextMenu
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
+        context.coordinator.onWikiLinkCompletion = onWikiLinkCompletion
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         context.coordinator.didInitialFormatting = true
@@ -647,7 +655,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             fontSize: fontSize,
             isWikiLinkActive: $isWikiLinkActive,
             onLinkClick: onLinkClick,
-            onInlineSelectionChange: onInlineSelectionChange
+            onInlineSelectionChange: onInlineSelectionChange,
+            onWikiLinkCompletion: onWikiLinkCompletion
         )
         coordinator.documentId = documentId
         coordinator.configuration = configuration

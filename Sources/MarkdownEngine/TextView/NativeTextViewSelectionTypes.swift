@@ -70,6 +70,20 @@ public struct InlineSelectionState: Sendable {
     }
 }
 
+/// A completed wiki-link typed directly in the editor.
+///
+/// This is intentionally separate from ``InlineSelectionState``: completing a
+/// link moves the caret outside its editable content, so autocomplete is no
+/// longer active, but embedders may still want to create or resolve its target.
+public struct WikiLinkCompletion: Sendable {
+    /// The completed link in display coordinates.
+    public let selection: WikiLinkSelection
+
+    public init(selection: WikiLinkSelection) {
+        self.selection = selection
+    }
+}
+
 /// A keyboard command forwarded to an open inline preview (the `[[…]]` autocomplete)
 /// via ``NativeTextViewWrapper/onInlinePreviewKey``. The embedder returns `true` to
 /// consume the key (it drove its list), or `false` to let the editor handle it normally.
