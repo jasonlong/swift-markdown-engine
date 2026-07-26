@@ -10,9 +10,27 @@ import AppKit
 
 extension NativeTextView {
     override func keyDown(with event: NSEvent) {
+        if handleWikiLinkOpeningBracket(event) { return }
         if handleOptionArrow(event) { return }
         if handleCommandReturn(event) { return }
         super.keyDown(with: event)
+    }
+
+    /// Intercept the physical key before AppKit's automatic bracket pairing
+    /// can turn the first `[` into `[]`. Wiki-link creation needs the literal
+    /// `[[` trigger so its end can be chosen later in the line.
+    private func handleWikiLinkOpeningBracket(_ event: NSEvent) -> Bool {
+        guard !configuration.rawSourceMode,
+              !hasMarkedText(),
+              event.charactersIgnoringModifiers == "["
+        else {
+            return false
+        }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let ignored: NSEvent.ModifierFlags = [.capsLock, .numericPad, .function, .shift]
+        guard modifiers.subtracting(ignored).isEmpty else { return false }
+        insertText("[", replacementRange: selectedRange())
+        return true
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {

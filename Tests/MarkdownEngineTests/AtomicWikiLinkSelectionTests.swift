@@ -207,6 +207,29 @@ struct AtomicWikiLinkSelectionTests {
         #expect(editor.textView.selectedRange() == NSRange(location: 8, length: 0))
     }
 
+    @Test("physical opening-bracket keys bypass AppKit pairing")
+    func physicalOpeningBracketKeysStayOpen() throws {
+        let editor = makeEditor(source: "Before")
+        editor.textView.setSelectedRange(NSRange(location: 6, length: 0))
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "[",
+            charactersIgnoringModifiers: "[",
+            isARepeat: false,
+            keyCode: 33
+        ))
+
+        editor.textView.keyDown(with: event)
+        editor.textView.keyDown(with: event)
+
+        #expect(editor.textView.string == "Before[[")
+    }
+
     @Test("typing an opening bracket wraps a text selection in an editable link")
     func openingBracketWrapsSelection() {
         let editor = makeEditor(source: "Before target after")
