@@ -32,6 +32,12 @@ extension NSAttributedString.Key {
     static let outlineDepth = NSAttributedString.Key("OutlineDepth")
     /// Marks a bullet that owns nested list-item descendants.
     static let outlineHasChildren = NSAttributedString.Key("OutlineHasChildren")
+    /// Document offset immediately after the final descendant of an expanded
+    /// outline item. The parent marker uses it to draw one continuous guide.
+    static let outlineGuideEnd = NSAttributedString.Key("OutlineGuideEnd")
+    /// Source location of the next sibling marker at this outline depth.
+    /// Lets a guide finish with the same visual clearance above that marker.
+    static let outlineGuideNextSibling = NSAttributedString.Key("OutlineGuideNextSibling")
     /// Marks a parent bullet whose descendants are currently collapsed.
     static let outlineCollapsed = NSAttributedString.Key("OutlineCollapsed")
     /// Marks descendant source hidden by a collapsed parent.
@@ -75,6 +81,10 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             // Extend left to container edge
             bounds.origin.x = -layoutFragmentFrame.origin.x
             bounds.size.width = containerWidth
+        }
+        if let guideBottom = outlineGuideBottomForOwnedOutline(in: bounds),
+           guideBottom > layoutFragmentFrame.maxY {
+            bounds.size.height += guideBottom - layoutFragmentFrame.maxY
         }
         // Extend bounds to cover block images that render below the text line
         // (visibleSource mode uses paragraphSpacing to create space for the image).
@@ -599,8 +609,6 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
     private func drawOutlineGuides(at point: CGPoint, in context: CGContext) {
         guard let textStorage, let range = fragmentNSRange, range.length > 0 else { return }
         let textView = textLayoutManager?.textContainer?.textView as? NativeTextView
-        let indent = textView?.configuration.lists.indentPerLevel
-            ?? MarkdownEditorConfiguration.default.lists.indentPerLevel
         let guideOpacity = textView?.configuration.lists.guideOpacity
             ?? MarkdownEditorConfiguration.default.lists.guideOpacity
         let color = (textView?.configuration.theme.mutedText ?? .secondaryLabelColor)
@@ -611,9 +619,10 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
         color.setStroke()
 
-        textStorage.enumerateAttribute(.outlineDepth, in: range, options: []) { [weak self] value, attrRange, _ in
-            guard let self, let depth = value as? Int, depth > 0,
+        textStorage.enumerateAttribute(.outlineGuideEnd, in: range, options: []) { [weak self] value, attrRange, _ in
+            guard let self, let descendantEnd = value as? Int,
                   textStorage.attribute(.outlineHidden, at: attrRange.location, effectiveRange: nil) == nil,
+                  textStorage.attribute(.outlineCollapsed, at: attrRange.location, effectiveRange: nil) == nil,
                   let position = self.drawPosition(forDocumentCharAt: attrRange.location, point: point) else {
                 return
             }
@@ -621,18 +630,133 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 ?? textView?.baseFont ?? .systemFont(ofSize: NSFont.systemFontSize)
             let paragraph = textStorage.attribute(.paragraphStyle, at: attrRange.location, effectiveRange: nil)
                 as? NSParagraphStyle
-            let top = position.baselineY - font.ascender - 2
-            let bottom = position.baselineY - font.descender
-                + (paragraph?.paragraphSpacing ?? 0) + 2
-            for ancestor in 1...depth {
-                let x = position.x - CGFloat(ancestor) * indent + 1.5
-                let path = NSBezierPath()
-                path.lineWidth = 1
-                path.move(to: CGPoint(x: x, y: top))
-                path.line(to: CGPoint(x: x, y: bottom))
-                path.stroke()
+            // A guide shares the parent's marker column, but should begin
+            // below that marker rather than visibly bisecting the bullet.
+            let bulletCenterY = BulletMarkerGeometry.centerY(
+                forBaseline: position.baselineY,
+                font: font
+            )
+            let top = bulletCenterY + BulletMarkerGeometry.dotDiameter(for: font) / 2 + 2
+            let markerWidth = ((textStorage.string as NSString).substring(with: attrRange) as NSString)
+                .size(withAttributes: [.font: font]).width
+            let x = position.x + markerWidth / 2
+            let markerDiameter = BulletMarkerGeometry.dotDiameter(for: font)
+            let siblingMarker = textStorage.attribute(
+                .outlineGuideNextSibling,
+                at: attrRange.location,
+                effectiveRange: nil
+            ) as? Int
+            let verticalInset = self.textContainerVerticalInset
+            let bottom = siblingMarker.flatMap { sibling in
+                self.bulletCenterYInContainerCoordinates(forDocumentCharacterAt: sibling)
+            }.map { $0 + verticalInset - markerDiameter / 2 - 2 }
+                ?? self.renderedBottomInContainerCoordinates(
+                    forDocumentCharacterAt: max(attrRange.location, descendantEnd - 1),
+                    paragraphSpacing: paragraph?.paragraphSpacing ?? 0
+                )
+                .map { $0 + verticalInset }
+                ?? (position.baselineY - font.descender + (paragraph?.paragraphSpacing ?? 0) + 2)
+            let path = NSBezierPath()
+            path.lineWidth = 1
+            path.move(to: CGPoint(x: x, y: top))
+            path.line(to: CGPoint(x: x, y: bottom))
+            path.stroke()
+        }
+    }
+
+    private func outlineGuideBottomForOwnedOutline(in fallback: CGRect) -> CGFloat? {
+        guard let textStorage, let range = fragmentNSRange else { return nil }
+        var bottom: CGFloat?
+        textStorage.enumerateAttribute(.outlineGuideEnd, in: range, options: []) { [weak self] value, attrRange, _ in
+            guard let self,
+                  let end = value as? Int,
+                  textStorage.attribute(.outlineCollapsed, at: attrRange.location, effectiveRange: nil) == nil
+            else { return }
+            let font = (textStorage.attribute(.font, at: attrRange.location, effectiveRange: nil) as? NSFont)
+                ?? .systemFont(ofSize: NSFont.systemFontSize)
+            let siblingMarker = textStorage.attribute(
+                .outlineGuideNextSibling,
+                at: attrRange.location,
+                effectiveRange: nil
+            ) as? Int
+            let candidate = siblingMarker.flatMap {
+                self.bulletCenterYInContainerCoordinates(forDocumentCharacterAt: $0)
+            }.map { $0 - BulletMarkerGeometry.dotDiameter(for: font) / 2 - 2 }
+                ?? self.renderedBottomInContainerCoordinates(
+                    forDocumentCharacterAt: max(0, end - 1)
+                )
+            if let candidate {
+                bottom = max(bottom ?? fallback.maxY, candidate)
             }
         }
+        return bottom
+    }
+
+    private var textContainerVerticalInset: CGFloat {
+        textLayoutManager?.textContainer?.textView?.textContainerInset.height ?? 0
+    }
+
+    /// Returns the paragraph's final rendered edge in text-container
+    /// coordinates. TextKit can split a wrapped list item into several layout
+    /// fragments; the marker fragment owns the guide, so it must reach the
+    /// last fragment rather than stopping after its own first visual line.
+    private func renderedBottomInContainerCoordinates(
+        forDocumentCharacterAt documentLocation: Int,
+        paragraphSpacing: CGFloat = 0
+    ) -> CGFloat? {
+        guard let textStorage,
+              let textLayoutManager,
+              let contentStorage = textLayoutManager.textContentManager as? NSTextContentStorage
+        else {
+            return nil
+        }
+
+        guard documentLocation < textStorage.length else { return nil }
+        guard let endLocation = contentStorage.location(
+            contentStorage.documentRange.location,
+            offsetBy: documentLocation
+        ), let lastFragment = textLayoutManager.textLayoutFragment(for: endLocation) else {
+            return nil
+        }
+        return lastFragment.layoutFragmentFrame.maxY + paragraphSpacing + 2
+    }
+
+    private func bulletCenterYInContainerCoordinates(
+        forDocumentCharacterAt documentLocation: Int
+    ) -> CGFloat? {
+        guard let textStorage,
+              let textLayoutManager,
+              let contentStorage = textLayoutManager.textContentManager as? NSTextContentStorage,
+              documentLocation < textStorage.length,
+              let location = contentStorage.location(
+                  contentStorage.documentRange.location,
+                  offsetBy: documentLocation
+              ), let fragment = textLayoutManager.textLayoutFragment(for: location)
+        else {
+            return nil
+        }
+        let start = contentStorage.offset(
+            from: contentStorage.documentRange.location,
+            to: fragment.rangeInElement.location
+        )
+        let localLocation = documentLocation - start
+        guard localLocation >= 0 else { return nil }
+        for line in fragment.textLineFragments {
+            let lineRange = line.characterRange
+            guard localLocation >= lineRange.location,
+                  localLocation < NSMaxRange(lineRange)
+            else {
+                continue
+            }
+            let font = (textStorage.attribute(.font, at: documentLocation, effectiveRange: nil) as? NSFont)
+                ?? .systemFont(ofSize: NSFont.systemFontSize)
+            let character = line.locationForCharacter(at: localLocation)
+            let baselineY = fragment.layoutFragmentFrame.origin.y
+                + line.typographicBounds.origin.y
+                + character.y
+            return BulletMarkerGeometry.centerY(forBaseline: baselineY, font: font)
+        }
+        return nil
     }
 
     // MARK: - Bullet Markers
@@ -680,6 +804,20 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 at: attrRange.location,
                 effectiveRange: nil
             ) as? Bool) == true
+            // Guides are painted first. Remove a symmetric amount of guide on
+            // both sides of the bullet so the line never appears to pass
+            // through its marker, regardless of which ancestor owns it.
+            let guideClearance: CGFloat = 3
+            let cutoutDiameter = dotDiameter + guideClearance * 2
+            theme.editorBackground.setFill()
+            NSBezierPath(
+                ovalIn: CGRect(
+                    x: center.x - cutoutDiameter / 2,
+                    y: center.y - cutoutDiameter / 2,
+                    width: cutoutDiameter,
+                    height: cutoutDiameter
+                )
+            ).fill()
             if isCollapsed {
                 let haloDiameter = dotDiameter + 9
                 theme.mutedText.withAlphaComponent(0.18).setFill()

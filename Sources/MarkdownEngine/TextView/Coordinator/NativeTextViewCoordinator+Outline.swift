@@ -66,10 +66,12 @@ extension NativeTextViewCoordinator {
         storage.beginEditing()
         storage.removeAttribute(.outlineDepth, range: fullRange)
         storage.removeAttribute(.outlineHasChildren, range: fullRange)
+        storage.removeAttribute(.outlineGuideEnd, range: fullRange)
+        storage.removeAttribute(.outlineGuideNextSibling, range: fullRange)
         storage.removeAttribute(.outlineCollapsed, range: fullRange)
         storage.removeAttribute(.outlineHidden, range: fullRange)
 
-        for item in items {
+        for (index, item) in items.enumerated() {
             storage.addAttribute(
                 .outlineDepth,
                 value: item.depth,
@@ -81,6 +83,21 @@ extension NativeTextViewCoordinator {
                     value: true,
                     range: item.markerRange
                 )
+                if let descendants = item.descendantRange {
+                    storage.addAttribute(
+                        .outlineGuideEnd,
+                        value: NSMaxRange(descendants),
+                        range: item.markerRange
+                    )
+                }
+                if let sibling = items[(index + 1)...].first(where: { $0.depth <= item.depth }),
+                   sibling.depth == item.depth {
+                    storage.addAttribute(
+                        .outlineGuideNextSibling,
+                        value: sibling.markerRange.location,
+                        range: item.markerRange
+                    )
+                }
             }
         }
 
@@ -124,10 +141,25 @@ extension NativeTextViewCoordinator {
         collapsedItems: [OutlineListItem]
     ) -> Bool {
         let expected = NSMutableAttributedString(string: storage.string)
-        for item in items {
+        for (index, item) in items.enumerated() {
             expected.addAttribute(.outlineDepth, value: item.depth, range: item.markerRange)
             if hasOutlineMarker(item), item.hasChildren {
                 expected.addAttribute(.outlineHasChildren, value: true, range: item.markerRange)
+                if let descendants = item.descendantRange {
+                    expected.addAttribute(
+                        .outlineGuideEnd,
+                        value: NSMaxRange(descendants),
+                        range: item.markerRange
+                    )
+                }
+                if let sibling = items[(index + 1)...].first(where: { $0.depth <= item.depth }),
+                   sibling.depth == item.depth {
+                    expected.addAttribute(
+                        .outlineGuideNextSibling,
+                        value: sibling.markerRange.location,
+                        range: item.markerRange
+                    )
+                }
             }
         }
         for item in collapsedItems {
@@ -140,6 +172,8 @@ extension NativeTextViewCoordinator {
         let keys: [NSAttributedString.Key] = [
             .outlineDepth,
             .outlineHasChildren,
+            .outlineGuideEnd,
+            .outlineGuideNextSibling,
             .outlineCollapsed,
             .outlineHidden,
         ]
