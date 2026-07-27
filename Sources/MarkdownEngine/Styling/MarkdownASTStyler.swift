@@ -260,10 +260,11 @@ enum MarkdownASTStyler {
         let additionalMarkerAdvance = markerContentGap + taskCheckboxAdvance
         let depthIndent = CGFloat(MarkdownLists.indentLevel(from: ws)) * ctx.config.lists.indentPerLevel
         let ps = NSMutableParagraphStyle()
-        let lineHeight = ctx.baseLineHeight + ctx.config.lists.extraLineHeight
-        ps.minimumLineHeight = lineHeight
-        ps.maximumLineHeight = lineHeight
-        ps.lineSpacing = 0
+        let leading = ctx.config.lists.extraLineHeight
+        // Keep AppKit's native (font-sized) insertion caret. Extra leading is
+        // line spacing, while the inter-item gap remains the shared paragraph
+        // spacing used everywhere else.
+        ps.lineSpacing = leading
         ps.paragraphSpacing = ctx.baseParagraphSpacing
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
