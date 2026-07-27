@@ -312,6 +312,9 @@ public struct ListStyle: Sendable {
     public var extraLineHeight: CGFloat
     /// Height of blank lines inside a nested loose list, relative to a body line.
     public var nestedBlankLineHeightScale: CGFloat
+    /// Height of a blank line immediately following a list, relative to a body line.
+    /// Defaults to one body line so existing editor appearances are preserved.
+    public var trailingBlankLineHeightScale: CGFloat
 
     public init(
         helpersEnabled: Bool = true,
@@ -322,7 +325,8 @@ public struct ListStyle: Sendable {
         guideOpacity: CGFloat = 0.16,
         maximumNestingLevel: Int = 3,
         extraLineHeight: CGFloat = 2,
-        nestedBlankLineHeightScale: CGFloat = 1
+        nestedBlankLineHeightScale: CGFloat = 1,
+        trailingBlankLineHeightScale: CGFloat = 1
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -333,6 +337,7 @@ public struct ListStyle: Sendable {
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
         self.nestedBlankLineHeightScale = nestedBlankLineHeightScale
+        self.trailingBlankLineHeightScale = trailingBlankLineHeightScale
     }
 
     public static let `default` = ListStyle()

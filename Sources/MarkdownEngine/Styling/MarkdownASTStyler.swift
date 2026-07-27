@@ -90,11 +90,14 @@ enum MarkdownASTStyler {
         for (index, block) in blocks.enumerated() where ctx.inScope(block.range) {
             let followsHeading = index > 0
                 && blocks[index - 1].isHeading
+            let followsList = index > 0
+                && blocks[index - 1].isList
             styleBlock(
                 block,
                 font: baseFont,
                 ctx: ctx,
                 followsHeading: followsHeading,
+                followsList: followsList,
                 into: &attrs
             )
         }
@@ -492,6 +495,7 @@ enum MarkdownASTStyler {
         font: NSFont,
         ctx: Ctx,
         followsHeading: Bool,
+        followsList: Bool,
         into attrs: inout [StyledRange]
     ) {
         switch block {
@@ -541,7 +545,7 @@ enum MarkdownASTStyler {
                 ctx: ctx,
                 overrideScale: followsHeading
                     ? ctx.config.headings.trailingBlankLineHeightScale
-                    : nil,
+                    : followsList ? ctx.config.lists.trailingBlankLineHeightScale : nil,
                 into: &attrs
             )
         case .blockLatex, .table:

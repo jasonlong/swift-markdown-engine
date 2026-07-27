@@ -63,6 +63,11 @@ indirect enum BlockNode: Equatable {
         if case .heading = self { return true }
         return false
     }
+
+    var isList: Bool {
+        if case .list = self { return true }
+        return false
+    }
 }
 
 enum DocumentAST {

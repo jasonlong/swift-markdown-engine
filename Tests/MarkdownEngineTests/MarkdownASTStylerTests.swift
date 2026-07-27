@@ -174,6 +174,30 @@ struct MarkdownASTStylerTests {
         #expect(nestedStyle?.minimumLineHeight == 1)
     }
 
+    @Test("a blank line after a list can be compacted without changing list rows")
+    func trailingListBlankLineHeight() {
+        let text = "- First\n\n## Next"
+        let blankLocation = (text as NSString).range(of: "\n\n").location + 1
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.lists.trailingBlankLineHeightScale = 0.5
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            configuration: configuration
+        )
+        let blankLineStyle = attrs.reversed().first { entry in
+            NSLocationInRange(blankLocation, entry.range)
+                && entry.attributes[.paragraphStyle] != nil
+        }?.attributes[.paragraphStyle] as? NSParagraphStyle
+        let bodyFont = NSFont(name: fontName, size: base) ?? .systemFont(ofSize: base)
+        let bodyLineHeight = ceil(bodyFont.ascender - bodyFont.descender + bodyFont.leading)
+            + configuration.paragraph.lineHeightExtraSpacing
+
+        #expect(blankLineStyle?.minimumLineHeight == bodyLineHeight * 0.5)
+        #expect(blankLineStyle?.paragraphSpacing == 0)
+    }
+
     @Test("nested emphasis in a paragraph composes bold+italic")
     func paragraphNestedEmphasis() {
         let attrs = MarkdownASTStyler.styleAttributes(text: "**a *b* c**", fontName: fontName, fontSize: base)
