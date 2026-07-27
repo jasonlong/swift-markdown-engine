@@ -71,10 +71,7 @@ extension NativeTextView {
         let marker = String(prefix.prefix(1))
         let markerWidth = (marker as NSString).size(withAttributes: [.font: font]).width
         let prefixWidth = (prefix as NSString).size(withAttributes: [.font: font]).width
-        let baselineY = BulletMarkerGeometry.listBaselineY(
-            for: font,
-            extraLineHeight: configuration.lists.extraLineHeight
-        )
+        let baselineY = BulletMarkerGeometry.listBaselineY(for: font)
         let textPadding = textContainer?.lineFragmentPadding ?? 0
         let markerX = textPadding + configuration.lists.firstLevelIndent
 

@@ -415,4 +415,34 @@ extension MarkdownStyler {
         }
         return lineRange
     }
+
+    /// Range of the whitespace-only line run containing `location`, or nil
+    /// when that line has content. Compacted blank lines reveal to full height
+    /// while the caret is inside them, so caret moves in/out of a run drive a
+    /// restyle exactly like `hrLineRange` does for thematic breaks.
+    static func blankRunRange(at location: Int, in text: String) -> NSRange? {
+        let nsText = text as NSString
+        guard nsText.length > 0 else { return nil }
+        let safeLoc = max(0, min(location, nsText.length))
+
+        func blankLineRange(containing innerLocation: Int) -> NSRange? {
+            let lineRange = nsText.lineRange(
+                for: NSRange(location: innerLocation, length: 0)
+            )
+            let line = nsText.substring(with: lineRange)
+            let isBlank = line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return isBlank ? lineRange : nil
+        }
+
+        guard let lineRange = blankLineRange(containing: safeLoc) else { return nil }
+        var start = lineRange.location
+        while start > 0, let previous = blankLineRange(containing: start - 1) {
+            start = previous.location
+        }
+        var end = NSMaxRange(lineRange)
+        while end < nsText.length, let next = blankLineRange(containing: end) {
+            end = NSMaxRange(next)
+        }
+        return NSRange(location: start, length: end - start)
+    }
 }

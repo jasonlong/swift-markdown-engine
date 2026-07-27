@@ -541,12 +541,19 @@ enum MarkdownASTStyler {
         case .ext(let node):
             styleExtensionBlock(node, font: font, ctx: ctx, into: &attrs)
         case .blank(let range):
+            // A blank INSIDE a loose list keeps its nested compaction; the
+            // followsList override is only for the separator blank after a
+            // list block (002d2ef would otherwise reset nested blanks to the
+            // trailing scale).
+            let isNestedBlank = ctx.nestedListBlankLocations.contains(range.location)
             styleBlankLine(
                 range: range,
                 ctx: ctx,
                 overrideScale: followsHeading
                     ? ctx.config.headings.trailingBlankLineHeightScale
-                    : followsList ? ctx.config.lists.trailingBlankLineHeightScale : nil,
+                    : followsList && !isNestedBlank
+                        ? ctx.config.lists.trailingBlankLineHeightScale
+                        : nil,
                 into: &attrs
             )
         case .blockLatex, .table:
@@ -560,6 +567,14 @@ enum MarkdownASTStyler {
         overrideScale: CGFloat?,
         into attrs: inout [StyledRange]
     ) {
+        // Compacted blank lines are real, editable newlines drawn at a reduced
+        // (possibly zero) height. While the caret or selection is inside the
+        // run, reveal it at full height — the same reveal contract as HR lines
+        // and fences — so Enter/Backspace there edit visible state instead of
+        // invisibly growing or shrinking the document.
+        let caretInside = NSLocationInRange(ctx.caret, range)
+            || (ctx.caret == NSMaxRange(range) && NSMaxRange(range) == ctx.ns.length)
+        if caretInside || ctx.selectionIntersects(range) { return }
         let scale = overrideScale
             ?? (ctx.nestedListBlankLocations.contains(range.location)
                 ? ctx.config.lists.nestedBlankLineHeightScale

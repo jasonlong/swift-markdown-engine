@@ -281,10 +281,7 @@ struct BasicEditingRegressionTests {
             + stack.textView.configuration.lists.markerContentGap
         #expect(metrics.contentX == expectedContentX)
         #expect(metrics.dotDiameter == BulletMarkerGeometry.dotDiameter(for: font))
-        let expectedBaseline = BulletMarkerGeometry.listBaselineY(
-            for: font,
-            extraLineHeight: stack.textView.configuration.lists.extraLineHeight
-        )
+        let expectedBaseline = BulletMarkerGeometry.listBaselineY(for: font)
         #expect(
             metrics.bulletCenter.y
                 == BulletMarkerGeometry.centerY(

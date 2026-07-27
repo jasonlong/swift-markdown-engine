@@ -79,21 +79,38 @@ extension NativeTextViewCoordinator {
         return true
     }
 
-    func editTouchesProtectedListPrefix(
+    /// What to do with a proposed edit that touches a protected list prefix.
+    enum ProtectedListPrefixEditAction {
+        /// The edit leaves every prefix intact (or removes whole ones) — let
+        /// it proceed as proposed.
+        case allow
+        /// The edit would corrupt a prefix and cannot be repaired (a caret
+        /// insertion inside the prefix, or typing over a partial slice of
+        /// it) — drop the keystroke.
+        case block
+        /// A deletion partially covering a prefix: a half-deleted `- [ ] `
+        /// is never what the user meant, so grow the deletion to the full
+        /// prefix and perform it programmatically.
+        case expandDeletion(NSRange)
+    }
+
+    func protectedListPrefixEditAction(
         affectedRange: NSRange,
         replacement: String?,
         in text: String
-    ) -> Bool {
+    ) -> ProtectedListPrefixEditAction {
         let nsText = text as NSString
         guard affectedRange.location >= 0,
-              NSMaxRange(affectedRange) <= nsText.length else { return false }
+              NSMaxRange(affectedRange) <= nsText.length else { return .allow }
         let currentText = nsText.substring(with: affectedRange)
         let isCheckboxToggle = currentText.range(
             of: #"^\[[ xX]\]$"#,
             options: .regularExpression
         ) != nil && (replacement == "[ ]" || replacement == "[x]")
-        if isCheckboxToggle { return false }
+        if isCheckboxToggle { return .allow }
 
+        var expandedRange = affectedRange
+        var touchesPartialPrefix = false
         let probeLocations = [
             affectedRange.location,
             max(affectedRange.location, NSMaxRange(affectedRange) - 1),
@@ -114,8 +131,62 @@ extension NativeTextViewCoordinator {
                 && NSMaxRange(affectedRange) >= NSMaxRange(protectedRange)
             let removesWholeLine = affectedRange.location <= lineRange.location
                 && NSMaxRange(affectedRange) >= NSMaxRange(lineRange)
-            if !removesWholePrefix && !removesWholeLine { return true }
+            if removesWholePrefix || removesWholeLine { continue }
+            touchesPartialPrefix = true
+            expandedRange = NSUnionRange(expandedRange, protectedRange)
         }
-        return false
+        guard touchesPartialPrefix else { return .allow }
+        let isDeletion = replacement?.isEmpty ?? true
+        guard affectedRange.length > 0, isDeletion else { return .block }
+        return .expandDeletion(expandedRange)
+    }
+
+    /// Whether the proposed edit can proceed exactly as proposed (`false`) or
+    /// needs intervention (`true` — blocked or expanded).
+    func editTouchesProtectedListPrefix(
+        affectedRange: NSRange,
+        replacement: String?,
+        in text: String
+    ) -> Bool {
+        if case .allow = protectedListPrefixEditAction(
+            affectedRange: affectedRange,
+            replacement: replacement,
+            in: text
+        ) {
+            return false
+        }
+        return true
+    }
+
+    /// Forward-delete at the end of a line joins the next line. When the next
+    /// line is a rendered list item, its presentation-only prefix must come
+    /// along with the newline — mirroring Backspace at the item's start —
+    /// instead of surviving as literal `- ` text glued mid-line.
+    func handleForwardDeleteBeforeProtectedListPrefix(_ textView: NSTextView) -> Bool {
+        let selection = textView.selectedRange()
+        let nsText = textView.string as NSString
+        guard selection.length == 0,
+              selection.location < nsText.length,
+              nsText.character(at: selection.location) == 0x0A,
+              let protectedRange = MarkdownStyler.listProtectedRange(
+                at: selection.location + 1,
+                in: textView.string
+              ),
+              protectedRange.location == selection.location + 1 else {
+            return false
+        }
+
+        let originalLength = nsText.length
+        let removalRange = NSRange(
+            location: selection.location,
+            length: 1 + protectedRange.length
+        )
+        MarkdownLists.performEdit(textView, replace: removalRange, with: "")
+        guard (textView.string as NSString).length
+            == originalLength - removalRange.length else {
+            return false
+        }
+        textView.setSelectedRange(NSRange(location: selection.location, length: 0))
+        return true
     }
 }

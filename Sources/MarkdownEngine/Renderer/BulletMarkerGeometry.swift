@@ -12,17 +12,11 @@ enum BulletMarkerGeometry {
         baselineY - font.capHeight / 2
     }
 
-    /// Baseline produced by TextKit for the fixed-height paragraph used by
-    /// rendered list items. Font ascender/descender rounding differs by family,
-    /// so derive it from AppKit's own default line and baseline metrics.
-    static func listBaselineY(for font: NSFont, extraLineHeight: CGFloat) -> CGFloat {
-        let naturalLineHeight = ceil(
-            font.ascender - font.descender + font.leading
-        )
-        let listLineHeight = naturalLineHeight + extraLineHeight
-        let layoutManager = NSLayoutManager()
-        return layoutManager.defaultBaselineOffset(for: font)
-            + listLineHeight
-            - layoutManager.defaultLineHeight(for: font)
+    /// Baseline produced by TextKit for a rendered list item's first line.
+    /// List paragraphs use the font's natural line height with extra leading
+    /// as lineSpacing (below the line), so the first baseline is AppKit's
+    /// default baseline offset for the font.
+    static func listBaselineY(for font: NSFont) -> CGFloat {
+        NSLayoutManager().defaultBaselineOffset(for: font)
     }
 }

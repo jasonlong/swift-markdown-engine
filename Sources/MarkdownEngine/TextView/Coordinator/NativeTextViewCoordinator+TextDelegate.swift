@@ -475,6 +475,14 @@ extension NativeTextViewCoordinator {
         let currentHRLine = MarkdownStyler.hrLineRange(at: selLoc, in: docText)
         let hrLineChanged = prevHRLine?.location != currentHRLine?.location
             || prevHRLine?.length != currentHRLine?.length
+        // Compacted blank lines reveal to full height while the caret is
+        // inside them. Like HRs they are attribute-only (no MarkdownToken),
+        // so caret moves in/out of a blank run need their own restyle signal.
+        let prevBlankRun = previousCaretLocation.flatMap {
+            MarkdownStyler.blankRunRange(at: $0, in: docText)
+        }
+        let currentBlankRun = MarkdownStyler.blankRunRange(at: selLoc, in: docText)
+        let blankRunChanged = prevBlankRun != currentBlankRun
         // Mid-drag restyle is suppressed because syntax changes can shift
         // layout while TextKit is extending the selection.
         let isDragSelecting = currentEventType == .leftMouseDragged || currentEventType == .periodic
@@ -482,7 +490,7 @@ extension NativeTextViewCoordinator {
             needsRestyleAfterDrag = false // textDidChange restyles this edit cycle.
         } else if isDragSelecting {
             needsRestyleAfterDrag = true
-        } else if tokensChanged || hrLineChanged || needsRestyleAfterDrag {
+        } else if tokensChanged || hrLineChanged || blankRunChanged || needsRestyleAfterDrag {
             needsRestyleAfterDrag = false
             // Candidates are built ONLY when a restyle actually runs — this
             // used to happen unconditionally on every selection change,
@@ -495,6 +503,10 @@ extension NativeTextViewCoordinator {
                 let safePrev = min(prevLoc, nsText.length)
                 paragraphCandidates.append(nsText.paragraphRange(for: NSRange(location: safePrev, length: 0)))
             }
+            // A blank run can span several lines; restyle the WHOLE run so its
+            // reveal/compact flip applies uniformly, not just to the caret line.
+            if let prevBlankRun { paragraphCandidates.append(prevBlankRun) }
+            if let currentBlankRun { paragraphCandidates.append(currentBlankRun) }
             // Latex/imageEmbed tokens only inside the caret/previous-caret
             // paragraphs (binary-searched); the rendered↔raw flip of a token
             // the caret entered or left is covered by tokenRestyleParagraphs.
@@ -517,6 +529,16 @@ extension NativeTextViewCoordinator {
             PerfTrace.measure("selRestyle") {
                 restyleTextView(tv, paragraphCandidates: paragraphCandidates, tokens: tokens,
                                 classified: parsed.classified, blocks: parsed.blocks)
+            }
+            // The reveal/compact flip changes real layout height (unlike the
+            // other selection restyles) — re-measure fit-content hosts so the
+            // editor frame tracks it.
+            if blankRunChanged,
+               let bottomTextView = tv as? NativeTextView,
+               let scrollView = tv.enclosingScrollView {
+                bottomTextView.recalcOverscroll(for: scrollView, debugTag: "blankReveal")
+                bottomTextView.scheduleFitContentRemeasure()
+                (scrollView as? ClampedScrollView)?.clampToInsets()
             }
         }
 
@@ -744,13 +766,26 @@ extension NativeTextViewCoordinator {
             pendingPreEditActiveTokenIndices = nil
             return true
         }
-        if editTouchesProtectedListPrefix(
+        switch protectedListPrefixEditAction(
             affectedRange: affectedCharRange,
             replacement: replacementString,
             in: preText
         ) {
+        case .allow:
+            break
+        case .block:
             pendingEditedRange = nil
             pendingPreEditActiveTokenIndices = nil
+            return false
+        case .expandDeletion(let expandedRange):
+            // Deleting a selection that ends (or starts) inside a rendered
+            // list prefix: silently dropping the keystroke reads as a dead
+            // Backspace. Delete the selection plus the rest of the prefix.
+            pendingPreEditActiveTokenIndices = nil
+            MarkdownLists.performEdit(textView, replace: expandedRange, with: "")
+            textView.setSelectedRange(
+                NSRange(location: expandedRange.location, length: 0)
+            )
             return false
         }
         guard let parsed = preEditParsed else { return true }
@@ -811,6 +846,10 @@ extension NativeTextViewCoordinator {
         if configuration.rawSourceMode { return false }
         if commandSelector == #selector(NSResponder.deleteBackward(_:)),
            handleBackspaceAtProtectedListStart(textView) {
+            return true
+        }
+        if commandSelector == #selector(NSResponder.deleteForward(_:)),
+           handleForwardDeleteBeforeProtectedListPrefix(textView) {
             return true
         }
         if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
@@ -959,10 +998,10 @@ extension NativeTextViewCoordinator {
         let lineRange = nsText.lineRange(for: NSRange(location: caretLoc, length: 0))
         let line = nsText.substring(with: lineRange)
 
-        let pattern = #"^([\t ]*)((\d+)\.|[-•*+])\s"#
-        let regex = try? NSRegularExpression(pattern: pattern)
-        if let regex = regex,
-           let match = regex.firstMatch(in: line, range: NSRange(location: 0, length: line.utf16.count)) {
+        if let match = MarkdownLists.backtabListRegex.firstMatch(
+            in: line,
+            range: NSRange(location: 0, length: line.utf16.count)
+        ) {
             let wsRangeLocal = match.range(at: 1)
             let wsString = (line as NSString).substring(with: wsRangeLocal)
             let wsDocStart = lineRange.location + wsRangeLocal.location
