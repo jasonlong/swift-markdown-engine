@@ -55,14 +55,65 @@ extension NativeTextViewCoordinator {
         }
 
         let fullRange = NSRange(location: 0, length: storage.length)
-        if outlineAttributesMatch(
-            in: storage,
-            fullRange: fullRange,
+        let expected = expectedOutlineAttributes(
+            for: storage.string,
             items: items,
             collapsedItems: resolved
-        ) {
+        )
+        guard let mismatches = outlineAttributeMismatches(
+            in: storage,
+            fullRange: fullRange,
+            expected: expected
+        ) else {
+            rebuildOutlineAttributes(
+                in: storage,
+                fullRange: fullRange,
+                items: items,
+                collapsedItems: resolved
+            )
             return
         }
+        if mismatches.isEmpty { return }
+
+        // Collapse/expand genuinely changes what is visible (hidden spans get
+        // fonts/colors beyond the outline keys), so it keeps the wholesale
+        // rebuild. Metadata-only changes — a Tab/Shift-Tab re-indent updating
+        // depth/guide values on a few marker ranges — rewrite exactly the
+        // mismatched ranges: the old remove-all/re-add-all pass invalidated
+        // every paragraph and TextKit redrew the whole note as a visible flash.
+        let visibilityChanged = mismatches.keys.contains {
+            $0 == .outlineCollapsed || $0 == .outlineHidden
+        }
+        if visibilityChanged {
+            rebuildOutlineAttributes(
+                in: storage,
+                fullRange: fullRange,
+                items: items,
+                collapsedItems: resolved
+            )
+            return
+        }
+
+        storage.beginEditing()
+        for (key, ranges) in mismatches {
+            for range in ranges {
+                storage.removeAttribute(key, range: range)
+                expected.enumerateAttribute(key, in: range, options: []) { value, subRange, _ in
+                    if let value {
+                        storage.addAttribute(key, value: value, range: subRange)
+                    }
+                }
+            }
+        }
+        storage.endEditing()
+    }
+
+    private func rebuildOutlineAttributes(
+        in storage: NSTextStorage,
+        fullRange: NSRange,
+        items: [OutlineListItem],
+        collapsedItems resolved: [OutlineListItem]
+    ) {
         storage.beginEditing()
         storage.removeAttribute(.outlineDepth, range: fullRange)
         storage.removeAttribute(.outlineHasChildren, range: fullRange)
@@ -131,16 +182,15 @@ extension NativeTextViewCoordinator {
         storage.endEditing()
     }
 
-    /// Ordinary edits move existing attributed ranges with their text. Avoid
-    /// clearing and rebuilding outline metadata across the whole document when
-    /// those ranges already describe the newly parsed outline exactly.
-    private func outlineAttributesMatch(
-        in storage: NSTextStorage,
-        fullRange: NSRange,
+    /// The outline attributes the document SHOULD carry, computed on a
+    /// detached attributed string: the diff against live storage drives both
+    /// the match check and the scoped rewrite.
+    private func expectedOutlineAttributes(
+        for text: String,
         items: [OutlineListItem],
         collapsedItems: [OutlineListItem]
-    ) -> Bool {
-        let expected = NSMutableAttributedString(string: storage.string)
+    ) -> NSAttributedString {
+        let expected = NSMutableAttributedString(string: text)
         for (index, item) in items.enumerated() {
             expected.addAttribute(.outlineDepth, value: item.depth, range: item.markerRange)
             if hasOutlineMarker(item), item.hasChildren {
@@ -168,7 +218,18 @@ extension NativeTextViewCoordinator {
                 expected.addAttribute(.outlineHidden, value: true, range: descendants)
             }
         }
+        return expected
+    }
 
+    /// Ranges where the live storage's outline attributes differ from
+    /// `expected`, per key. Empty = everything matches (ordinary edits move
+    /// attributed ranges with their text, so this is the common case). `nil` =
+    /// the walk could not make progress; the caller should rebuild wholesale.
+    private func outlineAttributeMismatches(
+        in storage: NSTextStorage,
+        fullRange: NSRange,
+        expected: NSAttributedString
+    ) -> [NSAttributedString.Key: [NSRange]]? {
         let keys: [NSAttributedString.Key] = [
             .outlineDepth,
             .outlineHasChildren,
@@ -177,6 +238,7 @@ extension NativeTextViewCoordinator {
             .outlineCollapsed,
             .outlineHidden,
         ]
+        var mismatches: [NSAttributedString.Key: [NSRange]] = [:]
         for key in keys {
             var location = 0
             while location < fullRange.length {
@@ -194,15 +256,25 @@ extension NativeTextViewCoordinator {
                     longestEffectiveRange: &expectedRange,
                     in: fullRange
                 )
-                if !outlineValuesEqual(current, wanted) {
-                    return false
-                }
                 let nextLocation = min(NSMaxRange(currentRange), NSMaxRange(expectedRange))
-                guard nextLocation > location else { return false }
+                guard nextLocation > location else { return nil }
+                if !outlineValuesEqual(current, wanted) {
+                    let mismatch = NSRange(
+                        location: location,
+                        length: nextLocation - location
+                    )
+                    var ranges = mismatches[key] ?? []
+                    if let last = ranges.last, NSMaxRange(last) == mismatch.location {
+                        ranges[ranges.count - 1] = NSUnionRange(last, mismatch)
+                    } else {
+                        ranges.append(mismatch)
+                    }
+                    mismatches[key] = ranges
+                }
                 location = nextLocation
             }
         }
-        return true
+        return mismatches
     }
 
     private func outlineValuesEqual(_ lhs: Any?, _ rhs: Any?) -> Bool {
