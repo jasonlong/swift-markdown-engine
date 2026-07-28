@@ -12,10 +12,18 @@ import AppKit
 
 extension NativeTextView {
     override func mouseDown(with event: NSEvent) {
+        let clickPoint = convert(event.locationInWindow, from: nil)
+        let characterIndex = characterIndexForInsertion(at: clickPoint)
+        if let coordinator = delegate as? NativeTextViewCoordinator,
+           let image = coordinator.renderedMarkdownImage(at: characterIndex, in: self),
+           let onImageClick = coordinator.onImageClick {
+            onImageClick(image)
+            return
+        }
         // Was the click point on a link? Captured before super.mouseDown, which
         // may park the caret elsewhere. Used to rescue a dropped link click.
         let clickedLink: (location: Int, target: Any)? = {
-            let idx = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
+            let idx = characterIndex
             guard let ts = textStorage, idx >= 0, idx < ts.length else {
                 return nil
             }

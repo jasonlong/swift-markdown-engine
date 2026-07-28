@@ -76,6 +76,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// to the system's default plain-text paste.
     public var onPasteImage: ((NSPasteboard) -> String?)?
 
+    /// Fires when the user clicks a rendered Markdown image. The engine passes
+    /// the source image and leaves presentation, such as a full-screen viewer,
+    /// to the embedder.
+    public var onImageClick: ((NSImage) -> Void)?
+
     /// Fires when the user clicks a `[[Name]]` link. The argument is the
     /// resolved opaque identifier (or the display name when no resolver
     /// was supplied).
@@ -149,6 +154,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         documentId: String = "default",
         isEditable: Bool = true,
         onPasteImage: ((NSPasteboard) -> String?)? = nil,
+        onImageClick: ((NSImage) -> Void)? = nil,
         onLinkClick: ((String) -> Void)? = nil,
         onWikiLinkHover: ((WikiLinkHoverState?) -> Void)? = nil,
         onCaretRectChange: ((CGRect) -> Void)? = nil,
@@ -175,6 +181,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.documentId = documentId
         self.isEditable = isEditable
         self.onPasteImage = onPasteImage
+        self.onImageClick = onImageClick
         self.onLinkClick = onLinkClick
         self.onWikiLinkHover = onWikiLinkHover
         self.onCaretRectChange = onCaretRectChange
@@ -336,6 +343,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.wikiLinkMetadata = initialState.metadata
         context.coordinator.onCaretRectChange = onCaretRectChange
+        context.coordinator.onImageClick = onImageClick
         context.coordinator.onBuildContextMenu = onBuildContextMenu
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
         context.coordinator.onWikiLinkCompletion = onWikiLinkCompletion
@@ -669,6 +677,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         coordinator.lastWikiFingerprint = configuration.services.wikiLinks.fingerprint()
         coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         coordinator.onInlinePreviewKey = onInlinePreviewKey
+        coordinator.onImageClick = onImageClick
         coordinator.userPrefersContinuousSpellChecking = configuration.spellChecking.continuousSpellChecking
         coordinator.userPrefersGrammarChecking = configuration.spellChecking.grammarChecking
         coordinator.userPrefersAutomaticSpellingCorrection = configuration.spellChecking.automaticSpellingCorrection

@@ -11,6 +11,16 @@ struct AtomicWikiLinkSelectionTests {
         var target: String?
     }
 
+    private struct ImageProvider: EmbeddedImageProvider {
+        let image: NSImage
+
+        func image(for reference: EmbeddedImageRequest) -> NSImage? {
+            image
+        }
+
+        func fingerprint() -> AnyHashable { "test-image" }
+    }
+
     private struct ExistingLinkResolver: WikiLinkResolver {
         func resolve(displayName: String, range: NSRange) -> WikiLinkResolution? {
             WikiLinkResolution(id: displayName, exists: true)
@@ -119,6 +129,34 @@ struct AtomicWikiLinkSelectionTests {
             editor.textView.selectedRange()
                 == NSRange(location: NSMaxRange(linkRange), length: 0)
         )
+    }
+
+    @Test("rendered Markdown images resolve to the image callback payload")
+    func renderedImageClickProvidesTheSourceImage() {
+        _ = NSApplication.shared
+        let image = NSImage(size: NSSize(width: 40, height: 20))
+        let source = "![[Screenshot.png]]"
+        let coordinator = NativeTextViewCoordinator(
+            text: .constant(source),
+            fontName: "SF Pro",
+            fontSize: 16,
+            isWikiLinkActive: .constant(false),
+            onLinkClick: nil,
+            onInlineSelectionChange: nil
+        )
+        coordinator.onImageClick = { _ in }
+        var configuration = MarkdownEditorConfiguration.default
+        configuration.services.images = ImageProvider(image: image)
+        coordinator.configuration = configuration
+
+        let textView = NativeTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 400))
+        textView.configuration = configuration
+        textView.delegate = coordinator
+        coordinator.textView = textView
+        coordinator.rebuildTextStorageAndStyle(textView, from: source)
+
+        #expect(coordinator.renderedMarkdownImage(at: 4, in: textView) === image)
+        #expect(coordinator.renderedMarkdownImage(at: source.utf16.count, in: textView) == nil)
     }
 
     @Test("partial selections expand to include complete wiki links")
