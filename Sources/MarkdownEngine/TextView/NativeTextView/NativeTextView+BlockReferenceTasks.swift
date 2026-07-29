@@ -34,4 +34,18 @@ extension NativeTextView {
         onToggle(reference)
         return true
     }
+
+    func openBlockReferenceIfHit(event: NSEvent) -> Bool {
+        guard let provider = blockReferencePresentationProvider,
+              let onOpen = onBlockReferenceOpen
+        else { return false }
+        let point = convert(event.locationInWindow, from: nil)
+        let characterIndex = characterIndexForInsertion(at: point)
+        guard let reference = MarkdownBlockReferenceSyntax.tokens(in: string).first(where: {
+            NSLocationInRange(characterIndex, $0.range)
+        }), provider(reference) != nil
+        else { return false }
+        onOpen(reference)
+        return true
+    }
 }

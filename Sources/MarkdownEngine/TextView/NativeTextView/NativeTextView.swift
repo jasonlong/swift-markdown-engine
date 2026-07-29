@@ -51,6 +51,7 @@ final class NativeTextView: NSTextView {
     var onPasteImage: ((NSPasteboard) -> String?)?
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
+    var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
     var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
     var wikiLinkHoverTrackingArea: NSTrackingArea?
     var hoveredWikiLinkRange: NSRange?

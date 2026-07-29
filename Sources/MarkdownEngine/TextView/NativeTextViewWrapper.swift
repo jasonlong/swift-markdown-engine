@@ -335,6 +335,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.onPasteImage = onPasteImage
         textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
+        textView.onBlockReferenceOpen = onBlockReferenceOpen
         textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
@@ -497,6 +498,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.onPasteImage = onPasteImage
         textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
+        textView.onBlockReferenceOpen = onBlockReferenceOpen
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)
