@@ -71,13 +71,22 @@ extension NativeTextViewCoordinator {
             }
             cards.append(.init(anchor: anchor, presentation: presentation, size: imageSize))
         }
-        guard let nativeTextView = textView as? NativeTextView else { return }
-        nativeTextView.blockReferenceCards = cards
-        nativeTextView.needsDisplay = true
-        DispatchQueue.main.async { [weak nativeTextView] in
-            guard let nativeTextView else { return }
+        guard let nativeTextView = textView as? NativeTextView,
+              let container = nativeTextView.superview as? NativeTextViewContainer
+        else { return }
+        let overlay = nativeTextView.blockReferenceCardOverlay ?? BlockReferenceCardOverlay(textView: nativeTextView)
+        if overlay.superview == nil {
+            overlay.frame = container.bounds
+            overlay.autoresizingMask = [.width, .height]
+            container.addSubview(overlay)
+            nativeTextView.blockReferenceCardOverlay = overlay
+        }
+        overlay.cards = cards
+        DispatchQueue.main.async { [weak nativeTextView, weak overlay, weak container] in
+            guard let nativeTextView, let overlay, let container else { return }
             nativeTextView.ensureVisibleLayout()
-            nativeTextView.needsDisplay = true
+            overlay.frame = container.bounds
+            overlay.needsDisplay = true
         }
     }
 }
@@ -198,15 +207,34 @@ private final class BlockReferenceAttachmentCell: NSTextAttachmentCell {
     }
 }
 
-enum BlockReferenceCardOverlay {
+final class BlockReferenceCardOverlay: NSView {
     struct Card {
         let anchor: NSRange
         let presentation: MarkdownBlockReferencePresentation
         let size: NSSize
     }
 
-    static func draw(cards: [Card], in textView: NativeTextView, dirtyRect: NSRect) {
-        guard let bridge = textView.layoutBridge,
+    weak var textView: NativeTextView?
+    var cards: [Card] = [] {
+        didSet { needsDisplay = true }
+    }
+
+    init(textView: NativeTextView) {
+        self.textView = textView
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let textView,
+              let bridge = textView.layoutBridge,
               let textContainer = textView.textContainer
         else { return }
         for card in cards {
@@ -216,8 +244,8 @@ enum BlockReferenceCardOverlay {
             )
             guard !anchorRect.isEmpty else { continue }
             let frame = NSRect(
-                x: textView.textContainerOrigin.x + anchorRect.minX,
-                y: textView.textContainerOrigin.y + anchorRect.minY,
+                x: textView.frame.minX + textView.textContainerOrigin.x + anchorRect.minX,
+                y: textView.frame.minY + textView.textContainerOrigin.y + anchorRect.minY,
                 width: card.size.width,
                 height: card.size.height
             )

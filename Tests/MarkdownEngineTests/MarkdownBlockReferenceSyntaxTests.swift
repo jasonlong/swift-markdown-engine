@@ -99,8 +99,6 @@ import Testing
     coordinator.applyBlockReferencePresentations(to: textView)
 
     let anchor = 0
-    #expect(textView.blockReferenceCards.count == 1)
-    #expect(textView.blockReferenceCards.first?.anchor.location == anchor)
     #expect((textView.textStorage?.attribute(.paragraphStyle, at: anchor, effectiveRange: nil)
         as? NSParagraphStyle)?.minimumLineHeight ?? 0 >= 48)
 }

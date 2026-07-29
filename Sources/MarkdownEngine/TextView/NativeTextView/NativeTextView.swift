@@ -51,7 +51,7 @@ final class NativeTextView: NSTextView {
     var onPasteImage: ((NSPasteboard) -> String?)?
     var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
-    var blockReferenceCards: [BlockReferenceCardOverlay.Card] = []
+    var blockReferenceCardOverlay: BlockReferenceCardOverlay?
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
@@ -98,10 +98,6 @@ final class NativeTextView: NSTextView {
         }
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        BlockReferenceCardOverlay.draw(cards: blockReferenceCards, in: self, dirtyRect: dirtyRect)
-    }
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
         // AppKit's normal hardware-key path can pair `[` before the delegate
