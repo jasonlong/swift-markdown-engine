@@ -119,6 +119,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Immutable display data retained for a future host-view presentation.
     /// This recovery baseline intentionally leaves the canonical token visible.
     public var blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    /// Creates a native surface for a resolved transclusion. The returned view
+    /// is hosted above the preserved Markdown token in the scrolling document.
+    public var blockReferenceSurface: ((MarkdownBlockReferenceToken, MarkdownBlockReferencePresentation, CGFloat) -> MarkdownBlockReferenceSurface?)?
+    /// Bump this when reference data changes without an edit to this document.
+    public var blockReferencePresentationRevision: UInt64
     /// Receives task activation from a future host-supplied reference surface.
     public var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     /// Asynchronously creates a portable drag payload for a source list row.
@@ -193,6 +198,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)? = nil,
+        blockReferenceSurface: ((MarkdownBlockReferenceToken, MarkdownBlockReferencePresentation, CGFloat) -> MarkdownBlockReferenceSurface?)? = nil,
+        blockReferencePresentationRevision: UInt64 = 0,
         onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)? = nil,
         sourceBlockIDToReveal: String? = nil,
@@ -228,6 +235,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
         self.blockReferencePresentation = blockReferencePresentation
+        self.blockReferenceSurface = blockReferenceSurface
+        self.blockReferencePresentationRevision = blockReferencePresentationRevision
         self.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         self.onBlockReferenceDrag = onBlockReferenceDrag
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
@@ -350,6 +359,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
         textView.blockReferencePasteResult = onBlockReferencePaste
+        textView.blockReferencePresentationProvider = blockReferencePresentation
+        textView.blockReferenceSurfaceProvider = blockReferenceSurface
         textView.onBlockReferenceDrag = onBlockReferenceDrag
         textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
@@ -396,9 +407,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         context.coordinator.onBlockReferenceOpen = onBlockReferenceOpen
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
+        context.coordinator.lastBlockReferencePresentationRevision = blockReferencePresentationRevision
 
         textView.recalcOverscroll(for: scrollView)
         textView.setPlaceholder(placeholder)
+        textView.updateBlockReferenceSurfaces()
         // Initial reading-column centering; the resize observer below handles later changes.
         if configuration.readingWidth != nil {
             textView.centerReadingColumn(forClipWidth: scrollView.contentView.bounds.width)
@@ -512,10 +525,16 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
 
         textView.onPasteImage = onPasteImage
         textView.blockReferencePasteResult = onBlockReferencePaste
+        textView.blockReferencePresentationProvider = blockReferencePresentation
+        textView.blockReferenceSurfaceProvider = blockReferenceSurface
         textView.onBlockReferenceDrag = onBlockReferenceDrag
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)
+        if context.coordinator.lastBlockReferencePresentationRevision != blockReferencePresentationRevision {
+            context.coordinator.lastBlockReferencePresentationRevision = blockReferencePresentationRevision
+            textView.updateBlockReferenceSurfaces()
+        }
         // Sync heightBehavior across all three layers (scroll view, text view,
         // coordinator) so a runtime switch fully reconfigures.
         let heightBehaviorChanged = textView.configuration.heightBehavior != configuration.heightBehavior

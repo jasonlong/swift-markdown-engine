@@ -50,6 +50,8 @@ final class NativeTextView: NSTextView {
     // MARK: Editor wiring
     var onPasteImage: ((NSPasteboard) -> String?)?
     var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
+    var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    var blockReferenceSurfaceProvider: ((MarkdownBlockReferenceToken, MarkdownBlockReferencePresentation, CGFloat) -> MarkdownBlockReferenceSurface?)?
     var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
     var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
     var wikiLinkHoverTrackingArea: NSTrackingArea?
@@ -85,6 +87,11 @@ final class NativeTextView: NSTextView {
     var wideTableOverlays: [Int: WideTableOverlay] = [:]
     /// Persisted horizontal scroll offset per wide table; survives restyles.
     var tableHorizontalScrollOffsets: [Int: CGFloat] = [:]
+
+    // MARK: Block-reference surface state
+    /// Native host views attached as siblings above the text view. They are
+    /// intentionally not text attachments: the canonical token stays in storage.
+    var blockReferenceSurfaceViews: [NSView] = []
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
