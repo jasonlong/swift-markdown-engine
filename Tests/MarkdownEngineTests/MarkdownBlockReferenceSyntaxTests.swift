@@ -28,3 +28,12 @@ import Testing
         in: source
     ))
 }
+
+@Test func sourceNavigationFindsTheLineContainingTheDurableID() {
+    let source = "First\n- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy\nLast\n"
+    let range = MarkdownBlockReferenceSyntax.lineRange(
+        forBlockID: "01hzy7vz8g4qj6m2n3r5t7w9xy",
+        in: source
+    )
+    #expect((source as NSString).substring(with: try! #require(range)) == "- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy")
+}

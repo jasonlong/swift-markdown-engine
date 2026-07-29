@@ -108,6 +108,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Reports the full-line block reference under the current caret or
     /// selection. The host owns resolution, presentation, and file actions.
     public var onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)?
+    /// When this value changes, the editor scrolls the source line carrying
+    /// that durable ID into view and briefly highlights it. Hosts own graph
+    /// navigation; the engine only performs local source reveal.
+    public var sourceBlockIDToReveal: String?
     /// Fires when the set of visible code blocks changes, so embedders can
     /// overlay copy buttons (see ``CodeBlockButton``).
     public var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
@@ -166,6 +170,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)? = nil,
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
+        sourceBlockIDToReveal: String? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
         placeholder: NSAttributedString? = nil,
@@ -194,6 +199,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onWikiLinkCompletion = onWikiLinkCompletion
         self.onInlinePreviewKey = onInlinePreviewKey
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
+        self.sourceBlockIDToReveal = sourceBlockIDToReveal
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
         self.placeholder = placeholder
@@ -642,6 +648,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             textView,
             from: text,
             invalidateLayout: isNodeSwitch || rawSourceModeChanged
+        )
+        context.coordinator.revealSourceBlockIfRequested(
+            sourceBlockIDToReveal,
+            in: textView
         )
         textView.recalcOverscroll(for: nsView)
         (nsView as? ClampedScrollView)?.clampToInsets()

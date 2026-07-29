@@ -76,6 +76,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     var onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)?
     var onInlinePreviewKey: ((InlinePreviewKey) -> Bool)?
     var onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)?
+    var lastRevealedSourceBlock: (documentID: String?, id: String)?
     var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
     var didInitialFormatting: Bool = false
     /// One-shot guard so `updateCodeBlockSelection` only forces a full-document layout once per document.

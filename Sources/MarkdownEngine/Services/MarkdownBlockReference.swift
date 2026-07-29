@@ -52,6 +52,21 @@ public enum MarkdownBlockReferenceSyntax {
         }
     }
 
+    /// Finds a source line carrying an ID so a host can reveal it after
+    /// resolving a deep link. The returned range is intentionally the visible
+    /// source line, not the invisible suffix, which makes the highlight useful
+    /// even when marker styling is active.
+    public static func lineRange(forBlockID blockID: String, in source: String) -> NSRange? {
+        guard MarkdownBlockIDShape.isValid(blockID) else { return nil }
+        let escapedID = NSRegularExpression.escapedPattern(for: blockID)
+        let expression = try! NSRegularExpression(pattern: "(?m)^.*\\^\(escapedID)\\s*$")
+        let text = source as NSString
+        return expression.firstMatch(
+            in: source,
+            range: NSRange(location: 0, length: text.length)
+        )?.range
+    }
+
     public static func tokens(in source: String) -> [MarkdownBlockReferenceToken] {
         let expression = try! NSRegularExpression(
             pattern: #"(?m)^\s*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\]\s*$"#
@@ -69,5 +84,12 @@ public enum MarkdownBlockReferenceSyntax {
                 range: match.range
             )
         }
+    }
+}
+
+private enum MarkdownBlockIDShape {
+    static func isValid(_ value: String) -> Bool {
+        value.utf8.count == 26
+            && value.allSatisfy { "0123456789abcdefghjkmnpqrstvwxyz".contains($0) }
     }
 }
