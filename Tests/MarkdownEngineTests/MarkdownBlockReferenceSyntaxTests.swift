@@ -38,6 +38,17 @@ import Testing
     #expect((source as NSString).substring(with: try! #require(range)) == "- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy")
 }
 
+@Test func referenceNavigationFindsTheSelectedReferenceOccurrence() {
+    let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+    let source = "![[Weekly#^\(id)]]\n![[Other#^\(id)]]\n"
+    let range = MarkdownBlockReferenceSyntax.lineRange(
+        forReferenceTo: "Other",
+        blockID: id,
+        in: source
+    )
+    #expect(try! #require(range).location == ("![[Weekly#^\(id)]]\n" as NSString).length)
+}
+
 @Test func transclusionEditsAreRejectedButBlockLinksRemainEditable() {
     let transclusion = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
     let link = "[[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
