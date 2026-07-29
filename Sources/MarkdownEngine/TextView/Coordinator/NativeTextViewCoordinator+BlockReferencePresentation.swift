@@ -72,20 +72,12 @@ extension NativeTextViewCoordinator {
             cards.append(.init(anchor: anchor, presentation: presentation, size: imageSize))
         }
         guard let nativeTextView = textView as? NativeTextView else { return }
-        let overlay = nativeTextView.blockReferenceCardOverlay ?? BlockReferenceCardOverlay()
-        if overlay.superview == nil {
-            overlay.frame = nativeTextView.bounds
-            overlay.autoresizingMask = [.width, .height]
-            nativeTextView.addSubview(overlay)
-            nativeTextView.blockReferenceCardOverlay = overlay
-        }
-        overlay.cards = cards
+        nativeTextView.blockReferenceCards = cards
         nativeTextView.needsDisplay = true
-        DispatchQueue.main.async { [weak nativeTextView, weak overlay] in
-            guard let nativeTextView, let overlay else { return }
+        DispatchQueue.main.async { [weak nativeTextView] in
+            guard let nativeTextView else { return }
             nativeTextView.ensureVisibleLayout()
-            overlay.frame = nativeTextView.bounds
-            overlay.needsDisplay = true
+            nativeTextView.needsDisplay = true
         }
     }
 }
@@ -206,24 +198,15 @@ private final class BlockReferenceAttachmentCell: NSTextAttachmentCell {
     }
 }
 
-final class BlockReferenceCardOverlay: NSView {
+enum BlockReferenceCardOverlay {
     struct Card {
         let anchor: NSRange
         let presentation: MarkdownBlockReferencePresentation
         let size: NSSize
     }
 
-    var cards: [Card] = [] {
-        didSet { needsDisplay = true }
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let textView = superview as? NativeTextView,
-              let bridge = textView.layoutBridge,
+    static func draw(cards: [Card], in textView: NativeTextView, dirtyRect: NSRect) {
+        guard let bridge = textView.layoutBridge,
               let textContainer = textView.textContainer
         else { return }
         for card in cards {
@@ -242,7 +225,7 @@ final class BlockReferenceCardOverlay: NSView {
             BlockReferenceAttachmentCell(
                 presentation: card.presentation,
                 width: card.size.width
-            ).draw(withFrame: frame, in: self)
+            ).draw(withFrame: frame, in: textView)
         }
     }
 }

@@ -51,7 +51,7 @@ final class NativeTextView: NSTextView {
     var onPasteImage: ((NSPasteboard) -> String?)?
     var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
-    var blockReferenceCardOverlay: BlockReferenceCardOverlay?
+    var blockReferenceCards: [BlockReferenceCardOverlay.Card] = []
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
@@ -96,6 +96,11 @@ final class NativeTextView: NSTextView {
         if let name = configuration.services.syntaxHighlighter.appearanceDidChangeNotification {
             NotificationCenter.default.post(name: name, object: self)
         }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        BlockReferenceCardOverlay.draw(cards: blockReferenceCards, in: self, dirtyRect: dirtyRect)
     }
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
