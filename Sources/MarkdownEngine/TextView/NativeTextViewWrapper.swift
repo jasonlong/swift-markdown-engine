@@ -105,6 +105,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Fires on ↑/↓/Enter/Esc while an inline `[[…]]` preview is open, so the
     /// embedder can drive its autocomplete list. Return `true` to consume the key.
     public var onInlinePreviewKey: ((InlinePreviewKey) -> Bool)?
+    /// Reports the full-line block reference under the current caret or
+    /// selection. The host owns resolution, presentation, and file actions.
+    public var onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)?
     /// Fires when the set of visible code blocks changes, so embedders can
     /// overlay copy buttons (see ``CodeBlockButton``).
     public var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
@@ -162,6 +165,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onInlineSelectionChange: ((InlineSelectionState?) -> Void)? = nil,
         onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)? = nil,
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
+        onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
         placeholder: NSAttributedString? = nil,
@@ -189,6 +193,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onInlineSelectionChange = onInlineSelectionChange
         self.onWikiLinkCompletion = onWikiLinkCompletion
         self.onInlinePreviewKey = onInlinePreviewKey
+        self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
         self.placeholder = placeholder
@@ -348,6 +353,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
         context.coordinator.onWikiLinkCompletion = onWikiLinkCompletion
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
+        context.coordinator.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
 
         textView.recalcOverscroll(for: scrollView)
@@ -657,6 +663,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onInlineSelectionChange = onInlineSelectionChange
         context.coordinator.onWikiLinkCompletion = onWikiLinkCompletion
         context.coordinator.onInlinePreviewKey = onInlinePreviewKey
+        context.coordinator.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         context.coordinator.didInitialFormatting = true
     }
@@ -677,6 +684,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         coordinator.lastWikiFingerprint = configuration.services.wikiLinks.fingerprint()
         coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         coordinator.onInlinePreviewKey = onInlinePreviewKey
+        coordinator.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         coordinator.onImageClick = onImageClick
         coordinator.userPrefersContinuousSpellChecking = configuration.spellChecking.continuousSpellChecking
         coordinator.userPrefersGrammarChecking = configuration.spellChecking.grammarChecking

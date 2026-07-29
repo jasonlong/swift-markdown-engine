@@ -370,6 +370,7 @@ extension NativeTextViewCoordinator {
         // snap-back branch mutates the text and re-reads explicitly.
         let docText = tv.string
         let nsText = docText as NSString
+        updateBlockReferenceSelection(in: docText, selection: selRange)
         // Mouse-/Wake-Fokus auf Link: kein Preview, erst Navigation. Gilt für alle Nicht-Key-Events.
         if currentEventType != .keyDown,
            selRange.location < nsText.length,
@@ -649,6 +650,17 @@ extension NativeTextViewCoordinator {
         if !shouldSkipSelectionRestyle {
             updateCodeBlockSelection(textView: tv, parsed: parsed)
         }
+    }
+
+    private func updateBlockReferenceSelection(in source: String, selection: NSRange) {
+        let active = MarkdownBlockReferenceSyntax.tokens(in: source).first { token in
+            if selection.length == 0 {
+                return selection.location >= token.range.location
+                    && selection.location <= NSMaxRange(token.range)
+            }
+            return NSIntersectionRange(selection, token.range).length > 0
+        }
+        onBlockReferenceSelectionChange?(active)
     }
 
     /// Whether the line-expanded window around `range` contains a registered
