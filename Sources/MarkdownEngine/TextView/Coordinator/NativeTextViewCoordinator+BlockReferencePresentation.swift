@@ -250,10 +250,37 @@ final class BlockReferenceCardOverlay: NSView {
                 height: card.size.height
             )
             guard frame.intersects(dirtyRect) else { continue }
-            BlockReferenceAttachmentCell(
-                presentation: card.presentation,
-                width: card.size.width
-            ).draw(withFrame: frame, in: textView)
+            drawCard(card.presentation, in: frame)
         }
+    }
+
+    private func drawCard(_ presentation: MarkdownBlockReferencePresentation, in frame: NSRect) {
+        let rect = frame.insetBy(dx: 1, dy: 2)
+        let accent: NSColor = switch presentation.state {
+        case .resolved: .controlAccentColor
+        case .broken, .ambiguous, .duplicate, .cyclic: .systemOrange
+        }
+        NSColor.controlBackgroundColor.withAlphaComponent(0.9).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
+        accent.setFill()
+        NSBezierPath(
+            roundedRect: NSRect(x: rect.minX, y: rect.minY, width: 2, height: rect.height),
+            xRadius: 1,
+            yRadius: 1
+        ).fill()
+        let body = presentation.markdown
+            .replacingOccurrences(of: "- [ ] ", with: "")
+            .replacingOccurrences(of: "- [x] ", with: "")
+        let textRect = NSRect(x: rect.minX + 16, y: rect.minY + 8, width: rect.width - 24, height: rect.height - 16)
+        let heading = NSAttributedString(
+            string: "↗  \(presentation.sourceLabel)\n",
+            attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor]
+        )
+        let content = NSMutableAttributedString(attributedString: heading)
+        content.append(NSAttributedString(
+            string: body.isEmpty ? "Referenced block" : body,
+            attributes: [.font: NSFont.systemFont(ofSize: 14), .foregroundColor: NSColor.labelColor]
+        ))
+        content.draw(in: textRect)
     }
 }
