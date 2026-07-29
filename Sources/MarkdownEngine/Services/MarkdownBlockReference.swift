@@ -85,8 +85,8 @@ public enum MarkdownBlockReferenceSyntax {
         tokens(in: source).contains { token in
             guard token.kind == .transclusion else { return false }
             if edit.length == 0 {
-                return edit.location >= token.range.location
-                    && edit.location <= NSMaxRange(token.range)
+                return edit.location > token.range.location
+                    && edit.location < NSMaxRange(token.range)
             }
             return NSIntersectionRange(edit, token.range).length > 0
         }
@@ -94,7 +94,7 @@ public enum MarkdownBlockReferenceSyntax {
 
     public static func tokens(in source: String) -> [MarkdownBlockReferenceToken] {
         let expression = try! NSRegularExpression(
-            pattern: #"(?m)^\s*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\]\s*$"#
+            pattern: #"(?m)^[ \t]*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\][ \t]*\r?$"#
         )
         let text = source as NSString
         return expression.matches(in: source, range: NSRange(location: 0, length: text.length)).compactMap { match in

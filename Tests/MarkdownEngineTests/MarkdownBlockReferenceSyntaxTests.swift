@@ -59,6 +59,27 @@ import Testing
         NSRange(location: 3, length: 0), in: link
     ))
 }
+
+@Test func transclusionRangesStayOnTheirLineAndLeaveCaretBoundariesEditable() {
+    let token = "  ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]  "
+    let source = "\(token)\n\n"
+    let range = try! #require(MarkdownBlockReferenceSyntax.tokens(in: source).first?.range)
+
+    #expect((source as NSString).substring(with: range) == token)
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: range.location, length: 0),
+        in: source
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: NSMaxRange(range), length: 0),
+        in: source
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: (source as NSString).length, length: 0),
+        in: source
+    ))
+}
+
 @Test func blockReferenceDragOnlyRecognizesSourceListRows() {
     let source = "Intro\n- [ ] Ship it\n2. Follow up\nPlain text"
     let task = try! #require(MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: source, atUTF16: 8))
