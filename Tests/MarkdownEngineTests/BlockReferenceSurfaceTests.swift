@@ -34,7 +34,8 @@ struct BlockReferenceSurfaceTests {
                 state: .resolved,
                 sourceLabel: "Weekly",
                 markdown: "- [ ] Ship the release",
-                isTaskComplete: false
+                isTaskComplete: false,
+                referenceCount: 2
             )
         }
         textView.blockReferenceSurfaceProvider = { _, _, _ in
@@ -50,6 +51,16 @@ struct BlockReferenceSurfaceTests {
         #expect(surface.frame.width > 300)
         #expect(surface.frame.height == 72)
         #expect(textView.string == source)
+        #expect(
+            textView.blockReferencePresentationProvider?(
+                MarkdownBlockReferenceToken(
+                    kind: .transclusion,
+                    noteTarget: "Weekly",
+                    blockID: "01hzy7vz8g4qj6m2n3r5t7w9xy",
+                    range: NSRange(location: 0, length: source.utf16.count)
+                )
+            )?.referenceCount == 2
+        )
 
         let rep = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
         root.cacheDisplay(in: root.bounds, to: rep)

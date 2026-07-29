@@ -97,9 +97,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Fires whenever the caret rect inside an active wiki-link changes,
     /// so embedders can position a follow-the-caret UI.
     public var onCaretRectChange: ((CGRect) -> Void)?
-    /// Build the editor's right-click menu (the engine ships no menu). Receives the default
-    /// NSMenu + the current selection range; return the menu to display (or unchanged).
-    public var onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)?
+    /// Build the editor's right-click menu (the engine ships no menu). Receives
+    /// the default menu plus the actual click and selection target; return the
+    /// menu to display (or unchanged).
+    public var onBuildContextMenu: ((NSMenu, MarkdownContextMenuTarget) -> NSMenu)?
     /// Fires when the caret enters or leaves a `[[Name]]` or `![[…]]`
     /// token. `nil` means the caret is no longer inside such a token.
     public var onInlineSelectionChange: ((InlineSelectionState?) -> Void)?
@@ -191,7 +192,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onLinkClick: ((String) -> Void)? = nil,
         onWikiLinkHover: ((WikiLinkHoverState?) -> Void)? = nil,
         onCaretRectChange: ((CGRect) -> Void)? = nil,
-        onBuildContextMenu: ((NSMenu, NSRange) -> NSMenu)? = nil,
+        onBuildContextMenu: ((NSMenu, MarkdownContextMenuTarget) -> NSMenu)? = nil,
         onInlineSelectionChange: ((InlineSelectionState?) -> Void)? = nil,
         onWikiLinkCompletion: ((WikiLinkCompletion) -> Void)? = nil,
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,

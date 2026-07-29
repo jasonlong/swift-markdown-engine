@@ -11,9 +11,9 @@ import Cocoa
 import SwiftUI
 
 extension NativeTextViewWrapper.Coordinator {
-    // The engine ships no built-in menu (API-only). It hands the default NSMenu + the
-    // current selection to the embedder's onBuildContextMenu hook, which returns the menu
-    // to show. The didMarkdown* actions below stay so embedders can drive them via the bus.
+    // The engine ships no built-in menu (API-only). It hands the default NSMenu
+    // plus the actual click target to the embedder's onBuildContextMenu hook.
+    // The didMarkdown* actions below stay so embedders can drive them via the bus.
     public func textView(_ textView: NSTextView,
                          menu: NSMenu,
                          for event: NSEvent,
@@ -29,7 +29,51 @@ extension NativeTextViewWrapper.Coordinator {
             menu.removeItem(at: fontIndex)
         }
         guard let build = onBuildContextMenu else { return menu }
-        return build(menu, textView.selectedRange())
+        return build(menu, contextMenuTarget(
+            in: textView,
+            event: event,
+            clickedCharacterIndex: charIndex
+        ))
+    }
+
+    func contextMenuTarget(
+        in textView: NSTextView,
+        event: NSEvent,
+        clickedCharacterIndex: Int
+    ) -> MarkdownContextMenuTarget {
+        guard let nativeTextView = textView as? NativeTextView else {
+            return MarkdownContextMenuTarget(
+                clickedCharacterIndex: clickedCharacterIndex,
+                selection: textView.selectedRange()
+            )
+        }
+        let viewPoint = nativeTextView.convert(event.locationInWindow, from: nil)
+        let containerPoint = CGPoint(
+            x: viewPoint.x - nativeTextView.textContainerOrigin.x,
+            y: viewPoint.y - nativeTextView.textContainerOrigin.y
+        )
+        return contextMenuTarget(
+            in: nativeTextView,
+            containerPoint: containerPoint,
+            clickedCharacterIndex: clickedCharacterIndex
+        )
+    }
+
+    func contextMenuTarget(
+        in textView: NativeTextView,
+        containerPoint: CGPoint,
+        clickedCharacterIndex: Int
+    ) -> MarkdownContextMenuTarget {
+        let markerLineRange = textView.renderedListMarkerHit(
+            at: containerPoint
+        ).map {
+            (textView.string as NSString).lineRange(for: $0)
+        }
+        return MarkdownContextMenuTarget(
+            clickedCharacterIndex: clickedCharacterIndex,
+            selection: textView.selectedRange(),
+            listMarkerLineRange: markerLineRange
+        )
     }
 
     /// Returns the smallest bold or boldItalic token that fully contains the selection, or nil when the selection isn't enclosed by emphasis with a bold trait.

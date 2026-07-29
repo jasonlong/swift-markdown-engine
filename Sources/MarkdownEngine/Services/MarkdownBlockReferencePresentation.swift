@@ -18,16 +18,19 @@ public struct MarkdownBlockReferencePresentation: Hashable, Sendable {
     public let sourceLabel: String
     public let markdown: String
     public let isTaskComplete: Bool?
+    public let referenceCount: Int
 
     public init(
         state: State,
         sourceLabel: String,
         markdown: String,
-        isTaskComplete: Bool? = nil
+        isTaskComplete: Bool? = nil,
+        referenceCount: Int = 0
     ) {
         self.state = state
         self.sourceLabel = sourceLabel
         self.markdown = markdown
         self.isTaskComplete = isTaskComplete
+        self.referenceCount = referenceCount
     }
 }
