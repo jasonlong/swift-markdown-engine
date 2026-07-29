@@ -119,6 +119,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Synchronously supplies a read-only visual surface for a resolved block
     /// reference. Returning `nil` keeps the portable token visible.
     public var blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    /// Changes whenever the host's source-block catalog changes. The editor
+    /// uses this value to refresh rendered transclusions even when the current
+    /// document's Markdown is unchanged.
+    public var blockReferencePresentationRevision: UInt64
     /// Invoked when the user clicks a task checkbox rendered inside a block
     /// transclusion. The host updates the source block; the transclusion is
     /// deliberately never edited in place.
@@ -195,6 +199,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)? = nil,
+        blockReferencePresentationRevision: UInt64 = 0,
         onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)? = nil,
         sourceBlockIDToReveal: String? = nil,
@@ -230,6 +235,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
         self.blockReferencePresentation = blockReferencePresentation
+        self.blockReferencePresentationRevision = blockReferencePresentationRevision
         self.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         self.onBlockReferenceDrag = onBlockReferenceDrag
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
@@ -401,6 +407,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         context.coordinator.onBlockReferenceOpen = onBlockReferenceOpen
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
+        // `textView.string` is assigned before the provider is available, so
+        // the first formatter pass cannot create attachments. Apply the
+        // presentation explicitly once the host callback is installed.
+        context.coordinator.applyBlockReferencePresentations(to: textView)
+        context.coordinator.lastBlockReferencePresentationRevision = blockReferencePresentationRevision
 
         textView.recalcOverscroll(for: scrollView)
         textView.setPlaceholder(placeholder)
@@ -524,6 +535,13 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)
+        if context.coordinator.lastBlockReferencePresentationRevision != blockReferencePresentationRevision {
+            context.coordinator.lastBlockReferencePresentationRevision = blockReferencePresentationRevision
+            let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+            if fullRange.length > 0 {
+                context.coordinator.restyleParagraphs([fullRange], in: textView)
+            }
+        }
         // Sync heightBehavior across all three layers (scroll view, text view,
         // coordinator) so a runtime switch fully reconfigures.
         let heightBehaviorChanged = textView.configuration.heightBehavior != configuration.heightBehavior
