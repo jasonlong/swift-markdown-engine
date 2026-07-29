@@ -31,7 +31,7 @@ extension NativeTextView {
 
     private func blockReferenceDragSelection(at point: CGPoint) -> MarkdownBlockReferenceDragSelection? {
         let index = characterIndexForInsertion(at: point)
-        MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: string, atUTF16: index)
+        return MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: string, atUTF16: index)
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
