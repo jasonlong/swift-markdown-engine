@@ -38,6 +38,9 @@ extension NativeTextView {
             // the cursor; stay silent — our tracking areas fire beneath it and
             // any set here fights the overlay's cursor (flicker).
             if isEditable { NSCursor.arrow.set() }
+        } else if isEditable, isOverBlockReferenceDragHandle(event) {
+            toolTip = "Drag to create a block reference"
+            NSCursor.openHand.set()
         } else if isEditable, isOverOutlineBullet(event) {
             NSCursor.pointingHand.set()
         } else if isEditable, isOverTaskCheckboxBox(event) {
@@ -52,6 +55,7 @@ extension NativeTextView {
             // and super keeps setting the I-beam through it.
             NSCursor.arrow.set()
         } else {
+            toolTip = nil
             super.mouseMoved(with: event)
             applyTextCursorOverride(for: event)
         }
@@ -61,6 +65,9 @@ extension NativeTextView {
     override func mouseEntered(with event: NSEvent) {
         if isInCursorExclusionZone(event) {
             if isEditable { NSCursor.arrow.set() }
+        } else if isEditable, isOverBlockReferenceDragHandle(event) {
+            toolTip = "Drag to create a block reference"
+            NSCursor.openHand.set()
         } else if isEditable, isOverOutlineBullet(event) {
             NSCursor.pointingHand.set()
         } else if isEditable, isOverTaskCheckboxBox(event) {
@@ -68,6 +75,7 @@ extension NativeTextView {
         } else if isEditable, isOverWideTableOverlay(event) {
             NSCursor.arrow.set()
         } else {
+            toolTip = nil
             super.mouseEntered(with: event)
             applyTextCursorOverride(for: event)
         }
@@ -76,6 +84,7 @@ extension NativeTextView {
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
+        toolTip = nil
         clearWikiLinkHover()
     }
 

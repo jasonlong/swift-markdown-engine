@@ -29,9 +29,19 @@ extension NativeTextView {
         return true
     }
 
-    private func blockReferenceDragSelection(at point: CGPoint) -> MarkdownBlockReferenceDragSelection? {
+    func blockReferenceDragSelection(at point: CGPoint) -> MarkdownBlockReferenceDragSelection? {
         let index = characterIndexForInsertion(at: point)
         return MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: string, atUTF16: index)
+    }
+
+    func isOverBlockReferenceDragHandle(_ event: NSEvent) -> Bool {
+        guard onBlockReferenceDrag != nil else { return false }
+        let point = convert(event.locationInWindow, from: nil)
+        let containerPoint = CGPoint(
+            x: point.x - textContainerOrigin.x,
+            y: point.y - textContainerOrigin.y
+        )
+        return containerPoint.x <= 14 && blockReferenceDragSelection(at: point) != nil
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
