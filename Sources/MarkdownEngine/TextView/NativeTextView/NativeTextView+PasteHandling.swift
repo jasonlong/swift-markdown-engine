@@ -126,10 +126,21 @@ extension NativeTextView {
             prefix = "\n"
         }
         let afterLocation = sel.location + sel.length
-        if afterLocation < nsText.length, nsText.character(at: afterLocation) != 0x0A {
+        let reusesFollowingNewline =
+            afterLocation < nsText.length && nsText.character(at: afterLocation) == 0x0A
+        if !reusesFollowingNewline {
             suffix = "\n"
         }
         insertPasted(prefix + embed + suffix, replacementRange: sel)
+
+        // When the destination already supplied the line break, `insertText`
+        // leaves the caret immediately before it — at the end of the hidden
+        // embed token. Advance across that existing newline so the next edit
+        // starts on the visible line below the rendered reference surface.
+        if reusesFollowingNewline {
+            let caret = min(selectedRange().location + 1, (string as NSString).length)
+            setSelectedRange(NSRange(location: caret, length: 0))
+        }
     }
 
     /// Reads the textual content of a pasted markdown/text file URL — the
