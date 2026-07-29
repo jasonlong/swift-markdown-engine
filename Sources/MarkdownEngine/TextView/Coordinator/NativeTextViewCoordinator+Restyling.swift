@@ -115,6 +115,7 @@ extension NativeTextViewCoordinator {
             }
         }
         textView.textStorage?.endEditing()
+        applyBlockReferencePresentations(to: textView)
         applyOutlineState(to: textView)
 
         textView.typingAttributes = TextStylingService.makeBaseTypingAttributes(
@@ -174,6 +175,7 @@ extension NativeTextViewCoordinator {
             precomputedBlocks: blocks,
             configuration: configuration
         )
+        applyBlockReferencePresentations(to: textView)
         applyOutlineState(to: textView)
         // Reconcile wide-table overlays after layout settles.
         if let nativeTextView = textView as? NativeTextView {

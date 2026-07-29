@@ -111,6 +111,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Invoked when a user activates a full-line reference token. The host
     /// resolves navigation; the engine does not know graph paths or titles.
     public var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
+    /// Synchronously supplies a read-only visual surface for a resolved block
+    /// reference. Returning `nil` keeps the portable token visible.
+    public var blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
     /// When this value changes, the editor scrolls the source line carrying
     /// that durable ID into view and briefly highlights it. Hosts own graph
     /// navigation; the engine only performs local source reveal.
@@ -174,6 +177,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
+        blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)? = nil,
         sourceBlockIDToReveal: String? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
@@ -204,6 +208,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onInlinePreviewKey = onInlinePreviewKey
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
+        self.blockReferencePresentation = blockReferencePresentation
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
@@ -322,6 +327,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
+        textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
@@ -482,6 +488,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         }
 
         textView.onPasteImage = onPasteImage
+        textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)

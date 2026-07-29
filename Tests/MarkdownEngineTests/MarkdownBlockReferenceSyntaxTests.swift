@@ -48,3 +48,15 @@ import Testing
         NSRange(location: 3, length: 0), in: link
     ))
 }
+
+@Test func blockReferencePresentationRetainsOnlyHostSuppliedDisplayState() {
+    let presentation = MarkdownBlockReferencePresentation(
+        state: .resolved,
+        sourceLabel: "Weekly",
+        markdown: "- [ ] Ship it",
+        isTaskComplete: false
+    )
+    #expect(presentation.sourceLabel == "Weekly")
+    #expect(presentation.markdown == "- [ ] Ship it")
+    #expect(presentation.isTaskComplete == false)
+}
