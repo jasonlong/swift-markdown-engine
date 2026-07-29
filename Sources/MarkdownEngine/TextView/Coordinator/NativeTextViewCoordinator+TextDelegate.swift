@@ -778,6 +778,14 @@ extension NativeTextViewCoordinator {
             pendingPreEditActiveTokenIndices = nil
             return true
         }
+        if MarkdownBlockReferenceSyntax.editIntersectsProtectedID(
+            affectedCharRange,
+            in: preText
+        ) {
+            pendingEditedRange = nil
+            pendingPreEditActiveTokenIndices = nil
+            return false
+        }
         switch protectedListPrefixEditAction(
             affectedRange: affectedCharRange,
             replacement: replacementString,

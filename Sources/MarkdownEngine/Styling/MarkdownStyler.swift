@@ -183,6 +183,17 @@ enum MarkdownStyler {
         result += styleImageLinks(ctx)
         let imgMs = Double(DispatchTime.now().uptimeNanoseconds - imgT0) / 1_000_000
         result += styleTables(ctx)
+        // IDs are durable source metadata, not visible prose. The storage
+        // remains untouched for portable Markdown while the edit delegate
+        // refuses partial mutations of these invisible suffixes.
+        let hiddenIDFont = NSFont.systemFont(ofSize: 0.1)
+        for range in MarkdownBlockReferenceSyntax.protectedIDRanges(in: text) {
+            result.append((range, [
+                .font: hiddenIDFont,
+                .foregroundColor: NSColor.clear,
+                .kern: -0.1,
+            ]))
+        }
         PerfTrace.note { "  styleAttributes: ast=\(String(format: "%.2f", astMs))ms latex+img4=\(String(format: "%.2f", imgMs))ms styledRanges=\(result.count)" }
         return result
     }

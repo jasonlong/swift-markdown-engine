@@ -9,3 +9,22 @@ import Testing
     #expect(tokens.first?.kind == .transclusion)
     #expect(tokens.first?.noteTarget == "Weekly")
 }
+
+@Test func blockIDSuffixesAreHiddenAndProtectedWithoutCapturingOrdinaryCaretPositions() {
+    let source = "- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy\n"
+    let range = try! #require(MarkdownBlockReferenceSyntax.protectedIDRanges(in: source).first)
+
+    #expect((source as NSString).substring(with: range) == " ^01hzy7vz8g4qj6m2n3r5t7w9xy")
+    #expect(MarkdownBlockReferenceSyntax.editIntersectsProtectedID(
+        NSRange(location: range.location + 4, length: 1),
+        in: source
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsProtectedID(
+        NSRange(location: range.location, length: 0),
+        in: source
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsProtectedID(
+        NSRange(location: NSMaxRange(range), length: 0),
+        in: source
+    ))
+}

@@ -22,6 +22,36 @@ public struct MarkdownBlockReferenceToken: Hashable, Sendable {
 /// menu, pasteboard, and navigation seams. Unknown or malformed input remains
 /// ordinary editor text.
 public enum MarkdownBlockReferenceSyntax {
+    /// The canonical end-of-line form used by Markdown-backed applications.
+    /// The ranges include the leading space so a normal copy can omit the
+    /// identity marker without leaving trailing whitespace behind.
+    public static func protectedIDRanges(in source: String) -> [NSRange] {
+        let expression = try! NSRegularExpression(
+            pattern: #"(?m)[ \t]+\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
+        )
+        let text = source as NSString
+        return expression.matches(
+            in: source,
+            range: NSRange(location: 0, length: text.length)
+        ).map(\.range)
+    }
+
+    /// Returns true if an edit would mutate a protected block identity. A
+    /// caret placed immediately before or after the suffix remains editable;
+    /// only an insertion/deletion *inside* the suffix is refused.
+    public static func editIntersectsProtectedID(
+        _ edit: NSRange,
+        in source: String
+    ) -> Bool {
+        protectedIDRanges(in: source).contains { idRange in
+            if edit.length == 0 {
+                return edit.location > idRange.location
+                    && edit.location < NSMaxRange(idRange)
+            }
+            return NSIntersectionRange(edit, idRange).length > 0
+        }
+    }
+
     public static func tokens(in source: String) -> [MarkdownBlockReferenceToken] {
         let expression = try! NSRegularExpression(
             pattern: #"(?m)^\s*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\]\s*$"#
