@@ -49,6 +49,7 @@ final class NativeTextView: NSTextView {
 
     // MARK: Editor wiring
     var onPasteImage: ((NSPasteboard) -> String?)?
+    var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?

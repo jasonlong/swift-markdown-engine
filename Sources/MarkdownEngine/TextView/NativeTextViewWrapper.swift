@@ -75,6 +75,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// `"![[my-image]]"`) to insert at the caret, or `nil` to fall through
     /// to the system's default plain-text paste.
     public var onPasteImage: ((NSPasteboard) -> String?)?
+    /// Lets a host accept or reject its private block-reference pasteboard
+    /// payload before the editor falls back to normal text paste. Rejection is
+    /// useful for self/cyclic drops, while Option-drag still asks for the
+    /// independent plain-text representation.
+    public var onBlockReferencePaste: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
 
     /// Fires when the user clicks a rendered Markdown image. The engine passes
     /// the source image and leaves presentation, such as a full-screen viewer,
@@ -178,6 +183,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         documentId: String = "default",
         isEditable: Bool = true,
         onPasteImage: ((NSPasteboard) -> String?)? = nil,
+        onBlockReferencePaste: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)? = nil,
         onImageClick: ((NSImage) -> Void)? = nil,
         onLinkClick: ((String) -> Void)? = nil,
         onWikiLinkHover: ((WikiLinkHoverState?) -> Void)? = nil,
@@ -212,6 +218,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.documentId = documentId
         self.isEditable = isEditable
         self.onPasteImage = onPasteImage
+        self.onBlockReferencePaste = onBlockReferencePaste
         self.onImageClick = onImageClick
         self.onLinkClick = onLinkClick
         self.onWikiLinkHover = onWikiLinkHover
@@ -344,6 +351,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
+        textView.blockReferencePasteResult = onBlockReferencePaste
         textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         textView.onBlockReferenceOpen = onBlockReferenceOpen
@@ -508,6 +516,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         }
 
         textView.onPasteImage = onPasteImage
+        textView.blockReferencePasteResult = onBlockReferencePaste
         textView.blockReferencePresentationProvider = blockReferencePresentation
         textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         textView.onBlockReferenceOpen = onBlockReferenceOpen

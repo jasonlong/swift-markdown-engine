@@ -29,6 +29,15 @@ public struct MarkdownBlockReferenceDragPayload: Sendable {
     }
 }
 
+/// The host's decision for a private block-reference pasteboard payload. The
+/// engine owns insertion mechanics, but only the host can determine whether a
+/// graph-scoped reference is valid at the current destination.
+public enum MarkdownBlockReferencePasteResult: Sendable {
+    case notHandled
+    case insertReference(String)
+    case rejected
+}
+
 public enum MarkdownBlockReferenceDragSyntax {
     /// Returns the full source line for a draggable unordered or ordered list
     /// item at a UTF-16 cursor position. Ordinary prose deliberately returns

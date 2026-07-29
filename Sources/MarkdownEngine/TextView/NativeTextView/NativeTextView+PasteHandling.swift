@@ -21,6 +21,17 @@ extension NativeTextView {
 
         let pasteboard = NSPasteboard.general
 
+        switch blockReferencePasteResult?(pasteboard) ?? .notHandled {
+        case .insertReference(let reference):
+            insertBlockEmbed(reference)
+            return
+        case .rejected:
+            NSSound.beep()
+            return
+        case .notHandled:
+            break
+        }
+
         if let imageEmbed = onPasteImage?(pasteboard), !imageEmbed.isEmpty {
             insertBlockEmbed(imageEmbed)
             return
