@@ -29,6 +29,26 @@ import Testing
     ))
 }
 
+@Test func blockIDSuffixProtectionLeavesBlankListContentEditable() {
+    let source = "*  ^01hzy7vz8g4qj6m2n3r5t7w9xy"
+    let range = try! #require(MarkdownBlockReferenceSyntax.protectedIDRanges(in: source).first)
+
+    #expect((source as NSString).substring(with: range) == " ^01hzy7vz8g4qj6m2n3r5t7w9xy")
+    #expect(range.location == 2)
+    #expect(
+        MarkdownBlockReferenceSyntax.visibleInsertionRange(
+            for: NSRange(location: NSMaxRange(range), length: 0),
+            replacement: "a",
+            in: source
+        ) == NSRange(location: 2, length: 0)
+    )
+    #expect(MarkdownBlockReferenceSyntax.visibleInsertionRange(
+        for: NSRange(location: NSMaxRange(range), length: 0),
+        replacement: "\n",
+        in: source
+    ) == nil)
+}
+
 @Test func sourceNavigationFindsTheLineContainingTheDurableID() {
     let source = "First\n- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy\nLast\n"
     let range = MarkdownBlockReferenceSyntax.lineRange(

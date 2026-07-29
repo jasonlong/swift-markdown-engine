@@ -359,6 +359,7 @@ extension NativeTextViewCoordinator {
         if configuration.rawSourceMode { return }
         if isWritingToolsActive { return }
         if redirectSelectionFromCollapsedOutline(in: tv) { return }
+        if redirectSelectionFromProtectedBlockID(in: tv) { return }
         if redirectSelectionFromProtectedListPrefix(in: tv) { return }
         PerfTrace.checkpoint("selIn")
         defer { PerfTrace.checkpoint("selOut") }
@@ -777,6 +778,15 @@ extension NativeTextViewCoordinator {
         if isUndoRedo {
             pendingPreEditActiveTokenIndices = nil
             return true
+        }
+        if redirectInsertionBeforeProtectedBlockID(
+            in: textView,
+            affectedRange: affectedCharRange,
+            replacement: replacementString,
+            source: preText
+        ) {
+            pendingPreEditActiveTokenIndices = nil
+            return false
         }
         if MarkdownBlockReferenceSyntax.editIntersectsProtectedID(
             affectedCharRange,

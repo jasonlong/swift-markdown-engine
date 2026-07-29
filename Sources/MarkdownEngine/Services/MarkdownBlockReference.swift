@@ -27,7 +27,7 @@ public enum MarkdownBlockReferenceSyntax {
     /// identity marker without leaving trailing whitespace behind.
     public static func protectedIDRanges(in source: String) -> [NSRange] {
         let expression = try! NSRegularExpression(
-            pattern: #"(?m)[ \t]+\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
+            pattern: #"(?m)[ \t]\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
         )
         let text = source as NSString
         return expression.matches(
@@ -43,13 +43,51 @@ public enum MarkdownBlockReferenceSyntax {
         _ edit: NSRange,
         in source: String
     ) -> Bool {
-        protectedIDRanges(in: source).contains { idRange in
-            if edit.length == 0 {
-                return edit.location > idRange.location
-                    && edit.location < NSMaxRange(idRange)
+        if edit.length == 0 {
+            guard let idRange = protectedIDRange(near: edit.location, in: source) else {
+                return false
             }
-            return NSIntersectionRange(edit, idRange).length > 0
+            return edit.location > idRange.location
+                && edit.location < NSMaxRange(idRange)
         }
+        return protectedIDRanges(in: source).contains { idRange in
+            NSIntersectionRange(edit, idRange).length > 0
+        }
+    }
+
+    /// A hidden end-of-line ID occupies the visual end of its source block.
+    /// TextKit can consequently report an insertion at the suffix's far edge
+    /// when the user clicks or types at the visible content end. Ordinary
+    /// single-line input belongs immediately before the suffix instead.
+    public static func visibleInsertionRange(
+        for edit: NSRange,
+        replacement: String?,
+        in source: String
+    ) -> NSRange? {
+        guard edit.length == 0,
+              let replacement,
+              !replacement.isEmpty,
+              !replacement.contains("\n"),
+              !replacement.contains("\r")
+        else { return nil }
+        guard let idRange = protectedIDRange(near: edit.location, in: source),
+              NSMaxRange(idRange) == edit.location
+        else { return nil }
+        return NSRange(location: idRange.location, length: 0)
+    }
+
+    static func protectedIDRange(near location: Int, in source: String) -> NSRange? {
+        let text = source as NSString
+        guard location >= 0, location <= text.length else { return nil }
+        let probe = min(max(location - 1, 0), text.length)
+        let lineRange = text.lineRange(for: NSRange(location: probe, length: 0))
+        let expression = try! NSRegularExpression(
+            pattern: #"[ \t]\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
+        )
+        return expression.firstMatch(
+            in: source,
+            range: lineRange
+        )?.range
     }
 
     /// Finds a source line carrying an ID so a host can reveal it after

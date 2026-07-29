@@ -37,6 +37,45 @@ struct ListPrefixProtectionTests {
         #expect(MarkdownStyler.listProtectedRange(at: 10, in: bulletText) == nil)
     }
 
+    @Test("a hidden ID on an empty list row leaves an insertion boundary")
+    func identifiedEmptyRowsLeaveContentBoundary() {
+        let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+        let bullet = "*  ^\(id)"
+        let task = "- [ ]  ^\(id)"
+
+        #expect(
+            MarkdownStyler.listProtectedRange(at: 1, in: bullet)
+                == NSRange(location: 0, length: 2)
+        )
+        #expect(MarkdownStyler.listProtectedRange(at: 2, in: bullet) == nil)
+        #expect(
+            MarkdownStyler.listProtectedRange(at: 5, in: task)
+                == NSRange(location: 0, length: 6)
+        )
+        #expect(MarkdownStyler.listProtectedRange(at: 6, in: task) == nil)
+    }
+
+    @Test("typing at the visual end of an identified empty bullet inserts before its ID")
+    func typingAtIdentifiedEmptyBulletEnd() {
+        _ = NSApplication.shared
+        let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+        let source = "*  ^\(id)"
+        let coordinator = makeCoordinator(text: source)
+        let textView = NativeTextView(frame: .zero)
+        textView.delegate = coordinator
+        coordinator.textView = textView
+        textView.string = source
+        textView.setSelectedRange(NSRange(location: source.utf16.count, length: 0))
+
+        #expect(!coordinator.textView(
+            textView,
+            shouldChangeTextIn: textView.selectedRange(),
+            replacementString: "a"
+        ))
+        #expect(textView.string == "* a ^\(id)")
+        #expect(textView.selectedRange() == NSRange(location: 3, length: 0))
+    }
+
     @Test("caret navigation skips protected list prefixes")
     func caretSkipsPrefixes() {
         let coordinator = makeCoordinator(text: taskText)

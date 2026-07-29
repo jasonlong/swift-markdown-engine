@@ -29,7 +29,10 @@ extension MarkdownStyler {
         ) else { return nil }
         let spacingRange = match.range(at: 3)
         guard spacingRange.location != NSNotFound else { return nil }
-        let contentStart = lineRange.location + NSMaxRange(spacingRange)
+        var contentStart = lineRange.location + NSMaxRange(spacingRange)
+        if let idRange = MarkdownBlockReferenceSyntax.protectedIDRanges(in: line).first {
+            contentStart = min(contentStart, lineRange.location + idRange.location)
+        }
         let protectedRange = NSRange(
             location: lineRange.location,
             length: contentStart - lineRange.location

@@ -55,6 +55,10 @@ extension MarkdownStyler {
             guard character == 0x20 || character == 0x09 else { break }
             contentStart += 1
         }
+        let line = nsText.substring(with: lineRange)
+        if let idRange = MarkdownBlockReferenceSyntax.protectedIDRanges(in: line).first {
+            contentStart = min(contentStart, lineRange.location + idRange.location)
+        }
         let protectedRange = NSRange(
             location: lineRange.location,
             length: contentStart - lineRange.location
@@ -78,6 +82,10 @@ extension MarkdownStyler {
             let character = nsText.character(at: contentStart)
             guard character == 0x20 || character == 0x09 else { break }
             contentStart += 1
+        }
+        let line = nsText.substring(with: lineRange)
+        if let idRange = MarkdownBlockReferenceSyntax.protectedIDRanges(in: line).first {
+            contentStart = min(contentStart, lineRange.location + idRange.location)
         }
         guard checkboxStart < contentStart else { return nil }
         return NSRange(location: checkboxStart, length: contentStart - checkboxStart)

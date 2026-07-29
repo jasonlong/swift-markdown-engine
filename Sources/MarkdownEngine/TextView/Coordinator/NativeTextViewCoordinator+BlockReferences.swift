@@ -1,6 +1,54 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
+    func redirectSelectionFromProtectedBlockID(in textView: NSTextView) -> Bool {
+        let selection = textView.selectedRange()
+        guard selection.length == 0,
+              let idRange = MarkdownBlockReferenceSyntax.protectedIDRange(
+                near: selection.location,
+                in: textView.string
+              ),
+              selection.location > idRange.location,
+              selection.location < NSMaxRange(idRange)
+        else { return false }
+
+        let event = NSApp.currentEvent
+        let isPlainRightArrow = event?.type == .keyDown
+            && event?.keyCode == 124
+            && event?.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty == true
+        let movingForward = isPlainRightArrow
+            && previousSelectedRange?.location == idRange.location
+        let target = movingForward ? NSMaxRange(idRange) : idRange.location
+        textView.setSelectedRange(NSRange(location: target, length: 0))
+        return true
+    }
+
+    func redirectInsertionBeforeProtectedBlockID(
+        in textView: NSTextView,
+        affectedRange: NSRange,
+        replacement: String?,
+        source: String
+    ) -> Bool {
+        guard let insertion = MarkdownBlockReferenceSyntax.visibleInsertionRange(
+            for: affectedRange,
+            replacement: replacement,
+            in: source
+        ), let replacement else {
+            return false
+        }
+
+        let originalLength = (textView.string as NSString).length
+        MarkdownLists.performEdit(textView, replace: insertion, with: replacement)
+        let replacementLength = replacement.utf16.count
+        if (textView.string as NSString).length == originalLength + replacementLength {
+            textView.setSelectedRange(NSRange(
+                location: insertion.location + replacementLength,
+                length: 0
+            ))
+        }
+        return true
+    }
+
     func revealSourceBlockIfRequested(_ blockID: String?, in textView: NSTextView) {
         guard let blockID,
               lastRevealedSourceBlock?.documentID != documentId || lastRevealedSourceBlock?.id != blockID,
