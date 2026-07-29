@@ -61,6 +61,19 @@ struct BlockReferenceSurfaceTests {
             (textView.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
                 == NSColor.clear
         )
+
+        // Selection-only restyles can reapply link presentation without
+        // changing the source. A second reconciliation must hide it again.
+        textView.textStorage?.addAttributes(
+            [.link: "nook://reference", .foregroundColor: NSColor.linkColor],
+            range: NSRange(location: 0, length: source.utf16.count)
+        )
+        textView.updateBlockReferenceSurfaces()
+        #expect(textView.textStorage?.attribute(.link, at: 0, effectiveRange: nil) == nil)
+        #expect(
+            (textView.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+                == NSColor.clear
+        )
         #expect(
             textView.blockReferencePresentationProvider?(
                 MarkdownBlockReferenceToken(

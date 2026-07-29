@@ -180,6 +180,7 @@ extension NativeTextViewCoordinator {
         if let nativeTextView = textView as? NativeTextView {
             DispatchQueue.main.async { [weak nativeTextView] in
                 nativeTextView?.updateWideTableOverlays()
+                nativeTextView?.updateBlockReferenceSurfaces()
             }
         }
     }
