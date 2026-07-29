@@ -41,6 +41,11 @@ struct BlockReferenceSurfaceTests {
         textView.blockReferenceSurfaceProvider = { _, _, _ in
             MarkdownBlockReferenceSurface(view: ProofSurface(), height: 72)
         }
+        textView.textStorage?.addAttribute(
+            .link,
+            value: "nook://reference",
+            range: NSRange(location: 0, length: source.utf16.count)
+        )
 
         root.layoutSubtreeIfNeeded()
         textView.updateBlockReferenceSurfaces()
@@ -51,6 +56,11 @@ struct BlockReferenceSurfaceTests {
         #expect(surface.frame.width > 300)
         #expect(surface.frame.height == 72)
         #expect(textView.string == source)
+        #expect(textView.textStorage?.attribute(.link, at: 0, effectiveRange: nil) == nil)
+        #expect(
+            (textView.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+                == NSColor.clear
+        )
         #expect(
             textView.blockReferencePresentationProvider?(
                 MarkdownBlockReferenceToken(
@@ -76,5 +86,11 @@ struct BlockReferenceSurfaceTests {
             color.redComponent > 0.7 && color.greenComponent < 0.3 && color.blueComponent < 0.5
         }
         #expect(painted)
+
+        textView.removeBlockReferenceSurfaces()
+        #expect(
+            textView.textStorage?.attribute(.link, at: 0, effectiveRange: nil) as? String
+                == "nook://reference"
+        )
     }
 }

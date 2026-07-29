@@ -3,6 +3,7 @@ import AppKit
 private extension NSAttributedString.Key {
     static let markdownBlockReferenceSurface = NSAttributedString.Key("MarkdownEngine.blockReferenceSurface")
     static let markdownBlockReferenceOriginalParagraph = NSAttributedString.Key("MarkdownEngine.blockReference.originalParagraph")
+    static let markdownBlockReferenceOriginalLink = NSAttributedString.Key("MarkdownEngine.blockReference.originalLink")
 }
 
 extension NativeTextView {
@@ -25,8 +26,6 @@ extension NativeTextView {
         removeBlockReferenceSurfaces()
         let source = string
         let sourceNSString = source as NSString
-        let fullRange = NSRange(location: 0, length: storage.length)
-        restoreBlockReferenceParagraphs(in: storage, fullRange: fullRange)
 
         let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
         var pending: [(token: MarkdownBlockReferenceToken, surface: MarkdownBlockReferenceSurface)] = []
@@ -46,6 +45,10 @@ extension NativeTextView {
             paragraph.lineBreakMode = .byClipping
             storage.addAttribute(.markdownBlockReferenceOriginalParagraph, value: existingParagraph, range: paragraphRange)
             storage.addAttribute(.paragraphStyle, value: paragraph, range: paragraphRange)
+            if let link = storage.attribute(.link, at: token.range.location, effectiveRange: nil) {
+                storage.addAttribute(.markdownBlockReferenceOriginalLink, value: link, range: token.range)
+            }
+            storage.removeAttribute(.link, range: token.range)
             storage.addAttributes([
                 .markdownBlockReferenceSurface: true,
                 .foregroundColor: NSColor.clear,
@@ -84,9 +87,14 @@ extension NativeTextView {
     func removeBlockReferenceSurfaces() {
         for view in blockReferenceSurfaceViews { view.removeFromSuperview() }
         blockReferenceSurfaceViews.removeAll()
+        guard let storage = textStorage, storage.length > 0 else { return }
+        restoreBlockReferenceAttributes(
+            in: storage,
+            fullRange: NSRange(location: 0, length: storage.length)
+        )
     }
 
-    private func restoreBlockReferenceParagraphs(in storage: NSTextStorage, fullRange: NSRange) {
+    private func restoreBlockReferenceAttributes(in storage: NSTextStorage, fullRange: NSRange) {
         var paragraphRanges: [NSRange] = []
         storage.enumerateAttribute(.markdownBlockReferenceOriginalParagraph, in: fullRange) { value, range, _ in
             guard value is NSParagraphStyle else { return }
@@ -104,6 +112,15 @@ extension NativeTextView {
             storage.addAttribute(.paragraphStyle, value: original, range: paragraphRange)
             storage.removeAttribute(.markdownBlockReferenceOriginalParagraph, range: paragraphRange)
             storage.removeAttribute(.markdownBlockReferenceSurface, range: paragraphRange)
+        }
+        var links: [(value: Any, range: NSRange)] = []
+        storage.enumerateAttribute(.markdownBlockReferenceOriginalLink, in: fullRange) { value, range, _ in
+            guard let value else { return }
+            links.append((value, range))
+        }
+        for (value, range) in links {
+            storage.addAttribute(.link, value: value, range: range)
+            storage.removeAttribute(.markdownBlockReferenceOriginalLink, range: range)
         }
     }
 }
