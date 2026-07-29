@@ -1,6 +1,34 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
+    func stabilizeTypingAttributesAtProtectedBlockIDBoundary(
+        in textView: NSTextView
+    ) {
+        let selection = textView.selectedRange()
+        guard selection.length == 0,
+              let idRange = MarkdownBlockReferenceSyntax.protectedIDRange(
+                near: selection.location,
+                in: textView.string
+              ),
+              selection.location == idRange.location
+                || selection.location == NSMaxRange(idRange)
+        else { return }
+
+        let (baseFont, paragraphStyle) =
+            TextStylingService.makeBaseFontAndStyle(
+                fontName: fontName,
+                fontSize: fontSize,
+                layoutBridge: layoutBridge,
+                configuration: configuration
+            )
+        textView.typingAttributes =
+            TextStylingService.makeBaseTypingAttributes(
+                font: baseFont,
+                paragraphStyle: paragraphStyle,
+                theme: configuration.theme
+            )
+    }
+
     func redirectSelectionFromProtectedBlockID(in textView: NSTextView) -> Bool {
         let selection = textView.selectedRange()
         guard selection.length == 0,
@@ -20,6 +48,7 @@ extension NativeTextViewCoordinator {
             && previousSelectedRange?.location == idRange.location
         let target = movingForward ? NSMaxRange(idRange) : idRange.location
         textView.setSelectedRange(NSRange(location: target, length: 0))
+        stabilizeTypingAttributesAtProtectedBlockIDBoundary(in: textView)
         return true
     }
 

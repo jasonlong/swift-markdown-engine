@@ -360,6 +360,7 @@ extension NativeTextViewCoordinator {
         if isWritingToolsActive { return }
         if redirectSelectionFromCollapsedOutline(in: tv) { return }
         if redirectSelectionFromProtectedBlockID(in: tv) { return }
+        stabilizeTypingAttributesAtProtectedBlockIDBoundary(in: tv)
         if redirectSelectionFromProtectedListPrefix(in: tv) { return }
         PerfTrace.checkpoint("selIn")
         defer { PerfTrace.checkpoint("selOut") }

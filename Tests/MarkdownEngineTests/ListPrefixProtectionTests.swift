@@ -77,6 +77,43 @@ struct ListPrefixProtectionTests {
         #expect(textView.selectedRange() == NSRange(location: 3, length: 0))
     }
 
+    @Test("a hidden ID boundary retains ordinary typing metrics")
+    func hiddenIDBoundaryTypingAttributes() throws {
+        _ = NSApplication.shared
+        let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+        let source = "* item ^\(id)\n* next"
+        let coordinator = makeCoordinator(text: source)
+        let textView = NativeTextView(frame: .zero)
+        textView.delegate = coordinator
+        coordinator.textView = textView
+        textView.string = source
+        let fullRange = NSRange(location: 0, length: (source as NSString).length)
+        textView.textStorage?.addAttribute(
+            .font,
+            value: NSFont.systemFont(ofSize: 16),
+            range: fullRange
+        )
+        let idRange = try #require(
+            MarkdownBlockReferenceSyntax.protectedIDRanges(in: source).first
+        )
+        textView.textStorage?.addAttribute(
+            .font,
+            value: NSFont.systemFont(ofSize: 0.1),
+            range: idRange
+        )
+        textView.setSelectedRange(NSRange(location: NSMaxRange(idRange), length: 0))
+        textView.delegate = nil
+        textView.typingAttributes[.font] = NSFont.systemFont(ofSize: 0.1)
+        textView.delegate = coordinator
+        #expect((textView.typingAttributes[.font] as? NSFont)?.pointSize == 0.1)
+        coordinator.textViewDidChangeSelection(
+            Notification(name: NSTextView.didChangeSelectionNotification, object: textView)
+        )
+        #expect(
+            (textView.typingAttributes[.font] as? NSFont)?.pointSize == 16
+        )
+    }
+
     @Test("caret navigation skips protected list prefixes")
     func caretSkipsPrefixes() {
         let coordinator = makeCoordinator(text: taskText)
