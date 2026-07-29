@@ -120,16 +120,39 @@ extension NativeTextView {
     func insertBlockEmbed(_ embed: String) {
         let sel = selectedRange()
         let nsText = string as NSString
+        let lineEnding = preferredLineEnding(in: string)
+        if let emptyLine = emptyMarkdownLine(containing: sel, in: nsText) {
+            let inserted = emptyLine.indentation + embed
+            let suffix = emptyLine.lineBreakLength == 0 ? lineEnding : ""
+            insertPasted(
+                inserted + suffix,
+                replacementRange: emptyLine.contentRange
+            )
+            if emptyLine.lineBreakLength > 0 {
+                let caret = min(
+                    selectedRange().location + emptyLine.lineBreakLength,
+                    (string as NSString).length
+                )
+                setSelectedRange(NSRange(location: caret, length: 0))
+            }
+            return
+        }
+
         var prefix = ""
         var suffix = ""
-        if sel.location > 0, nsText.character(at: sel.location - 1) != 0x0A {
-            prefix = "\n"
+        if sel.location > 0 {
+            let previous = nsText.character(at: sel.location - 1)
+            if previous != 0x0A && previous != 0x0D {
+                prefix = lineEnding
+            }
         }
         let afterLocation = sel.location + sel.length
-        let reusesFollowingNewline =
-            afterLocation < nsText.length && nsText.character(at: afterLocation) == 0x0A
-        if !reusesFollowingNewline {
-            suffix = "\n"
+        let followingLineBreakLength = lineBreakLength(
+            at: afterLocation,
+            in: nsText
+        )
+        if followingLineBreakLength == 0 {
+            suffix = lineEnding
         }
         insertPasted(prefix + embed + suffix, replacementRange: sel)
 
@@ -137,10 +160,86 @@ extension NativeTextView {
         // leaves the caret immediately before it — at the end of the hidden
         // embed token. Advance across that existing newline so the next edit
         // starts on the visible line below the rendered reference surface.
-        if reusesFollowingNewline {
-            let caret = min(selectedRange().location + 1, (string as NSString).length)
+        if followingLineBreakLength > 0 {
+            let caret = min(
+                selectedRange().location + followingLineBreakLength,
+                (string as NSString).length
+            )
             setSelectedRange(NSRange(location: caret, length: 0))
         }
+    }
+
+    private struct EmptyMarkdownLine {
+        let contentRange: NSRange
+        let indentation: String
+        let lineBreakLength: Int
+    }
+
+    /// Daily notes and ordinary Return handling can leave an empty Markdown
+    /// list marker at the insertion point. A block embed replaces that empty
+    /// container instead of becoming `- ![[…]]`, while preserving indentation
+    /// so an intentionally nested destination remains nested.
+    private func emptyMarkdownLine(
+        containing selection: NSRange,
+        in text: NSString
+    ) -> EmptyMarkdownLine? {
+        guard selection.location >= 0,
+              selection.length >= 0,
+              selection.location + selection.length <= text.length
+        else { return nil }
+
+        let probe = min(selection.location, max(0, text.length - 1))
+        let lineRange = text.lineRange(
+            for: NSRange(location: probe, length: 0)
+        )
+        var contentEnd = NSMaxRange(lineRange)
+        if contentEnd > lineRange.location,
+           text.character(at: contentEnd - 1) == 0x0A {
+            contentEnd -= 1
+        }
+        if contentEnd > lineRange.location,
+           text.character(at: contentEnd - 1) == 0x0D {
+            contentEnd -= 1
+        }
+        let contentRange = NSRange(
+            location: lineRange.location,
+            length: contentEnd - lineRange.location
+        )
+        guard selection.location >= contentRange.location,
+              selection.location + selection.length <= NSMaxRange(contentRange)
+        else { return nil }
+
+        let line = text.substring(with: contentRange)
+        let expression = try! NSRegularExpression(
+            pattern: #"^([ \t]*)(?:(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]*)?)?$"#
+        )
+        guard let match = expression.firstMatch(
+            in: line,
+            range: NSRange(location: 0, length: (line as NSString).length)
+        ) else { return nil }
+        return EmptyMarkdownLine(
+            contentRange: contentRange,
+            indentation: (line as NSString).substring(with: match.range(at: 1)),
+            lineBreakLength: NSMaxRange(lineRange) - contentEnd
+        )
+    }
+
+    private func preferredLineEnding(in source: String) -> String {
+        if source.contains("\r\n") { return "\r\n" }
+        if source.contains("\r") && !source.contains("\n") { return "\r" }
+        return "\n"
+    }
+
+    private func lineBreakLength(at location: Int, in text: NSString) -> Int {
+        guard location >= 0, location < text.length else { return 0 }
+        let first = text.character(at: location)
+        if first == 0x0D {
+            return location + 1 < text.length
+                && text.character(at: location + 1) == 0x0A
+                ? 2
+                : 1
+        }
+        return first == 0x0A ? 1 : 0
     }
 
     /// Reads the textual content of a pasted markdown/text file URL — the

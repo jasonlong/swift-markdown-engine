@@ -106,4 +106,51 @@ struct BlockReferenceSurfaceTests {
                 == "nook://reference"
         )
     }
+
+    @Test("a legacy list-contained reference receives the same host surface")
+    func listContainedReferenceIsRendered() throws {
+        _ = NSApplication.shared
+        let source = "- ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 120))
+        let scrollView = NSScrollView(frame: root.bounds)
+        let container = NativeTextViewContainer(frame: root.bounds)
+        let textView = NativeTextView(frame: root.bounds)
+        root.addSubview(scrollView)
+        container.textView = textView
+        container.addSubview(textView)
+        scrollView.documentView = container
+        textView.string = source
+        let layoutBridge = LayoutBridge(try #require(textView.textLayoutManager))
+        textView.layoutBridge = layoutBridge
+        textView.blockReferencePresentationProvider = { _ in
+            MarkdownBlockReferencePresentation(
+                state: .resolved,
+                sourceLabel: "Weekly",
+                markdown: "- Source item"
+            )
+        }
+        textView.blockReferenceSurfaceProvider = { _, _, _ in
+            MarkdownBlockReferenceSurface(view: ProofSurface(), height: 28)
+        }
+
+        root.layoutSubtreeIfNeeded()
+        textView.updateBlockReferenceSurfaces()
+        root.layoutSubtreeIfNeeded()
+
+        #expect(textView.blockReferenceSurfaceViews.count == 1)
+        let token = try #require(
+            MarkdownBlockReferenceSyntax.tokens(in: source).first
+        )
+        #expect(token.range == NSRange(
+            location: 0,
+            length: (source as NSString).length
+        ))
+        #expect(
+            (textView.textStorage?.attribute(
+                .foregroundColor,
+                at: 0,
+                effectiveRange: nil
+            ) as? NSColor) == .clear
+        )
+    }
 }

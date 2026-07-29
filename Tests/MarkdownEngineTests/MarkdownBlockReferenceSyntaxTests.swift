@@ -10,6 +10,56 @@ import Testing
     #expect(tokens.first?.noteTarget == "Weekly")
 }
 
+@Test func blockReferenceSyntaxRecognizesEmptyListContainersWithoutAcceptingProse() {
+    let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+    let supported = [
+        "- ![[Weekly#^\(id)]]",
+        "  * ![[Weekly#^\(id)]]",
+        "+ ![[Weekly#^\(id)]]",
+        "1. ![[Weekly#^\(id)]]",
+        "2) ![[Weekly#^\(id)]]",
+        "- [ ] ![[Weekly#^\(id)]]",
+        "  - [x] ![[Weekly#^\(id)]]",
+    ]
+    for source in supported {
+        let token = try! #require(
+            MarkdownBlockReferenceSyntax.tokens(in: source).first
+        )
+        #expect(token.kind == .transclusion)
+        #expect(token.noteTarget == "Weekly")
+        #expect(token.range == NSRange(
+            location: 0,
+            length: (source as NSString).length
+        ))
+    }
+
+    let unsupported = [
+        "- explanation ![[Weekly#^\(id)]]",
+        "> ![[Weekly#^\(id)]]",
+        "`![[Weekly#^\(id)]]`",
+    ]
+    for source in unsupported {
+        #expect(MarkdownBlockReferenceSyntax.tokens(in: source).isEmpty)
+    }
+}
+
+@Test func listContainedTransclusionsRemainReadOnlyAcrossTheirWholeLine() {
+    let source = "  - [ ] ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]\r\n"
+    let token = try! #require(
+        MarkdownBlockReferenceSyntax.tokens(in: source).first
+    )
+    #expect((source as NSString).substring(with: token.range)
+        == "  - [ ] ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]")
+    #expect(MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: 2, length: 1),
+        in: source
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: NSMaxRange(token.range), length: 0),
+        in: source
+    ))
+}
+
 @Test func blockIDSuffixesAreHiddenAndProtectedWithoutCapturingOrdinaryCaretPositions() {
     let source = "- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy\n"
     let range = try! #require(MarkdownBlockReferenceSyntax.protectedIDRanges(in: source).first)

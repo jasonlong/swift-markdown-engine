@@ -132,7 +132,7 @@ public enum MarkdownBlockReferenceSyntax {
 
     public static func tokens(in source: String) -> [MarkdownBlockReferenceToken] {
         let expression = try! NSRegularExpression(
-            pattern: #"(?m)^[ \t]*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\][ \t]*\r?$"#
+            pattern: #"(?m)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)?(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\][ \t]*\r?$"#
         )
         let text = source as NSString
         return expression.matches(in: source, range: NSRange(location: 0, length: text.length)).compactMap { match in
