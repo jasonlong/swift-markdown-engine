@@ -60,3 +60,14 @@ import Testing
     #expect(presentation.markdown == "- [ ] Ship it")
     #expect(presentation.isTaskComplete == false)
 }
+
+@Test func blockReferenceDragOnlyRecognizesSourceListRows() {
+    let source = "Intro\n- [ ] Ship it\n2. Follow up\nPlain text"
+    let task = try! #require(MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: source, atUTF16: 8))
+    let ordered = try! #require(MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: source, atUTF16: 25))
+
+    #expect((source as NSString).substring(with: NSRange(location: task.location, length: task.length)) == "- [ ] Ship it\n")
+    #expect((source as NSString).substring(with: NSRange(location: ordered.location, length: ordered.length)) == "2. Follow up\n")
+    #expect(MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: source, atUTF16: 1) == nil)
+    #expect(MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: source, atUTF16: 40) == nil)
+}
