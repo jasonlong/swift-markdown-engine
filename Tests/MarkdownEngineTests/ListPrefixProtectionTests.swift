@@ -59,20 +59,21 @@ struct ListPrefixProtectionTests {
     func typingAtIdentifiedEmptyBulletEnd() {
         _ = NSApplication.shared
         let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
-        let source = "*  ^\(id)"
+        let source = "*  ^\(id)\n* next"
         let coordinator = makeCoordinator(text: source)
         let textView = NativeTextView(frame: .zero)
         textView.delegate = coordinator
         coordinator.textView = textView
         textView.string = source
-        textView.setSelectedRange(NSRange(location: source.utf16.count, length: 0))
+        let idEnd = ("*  ^\(id)" as NSString).length
+        textView.setSelectedRange(NSRange(location: idEnd, length: 0))
 
         #expect(!coordinator.textView(
             textView,
             shouldChangeTextIn: textView.selectedRange(),
             replacementString: "a"
         ))
-        #expect(textView.string == "* a ^\(id)")
+        #expect(textView.string == "* a ^\(id)\n* next")
         #expect(textView.selectedRange() == NSRange(location: 3, length: 0))
     }
 

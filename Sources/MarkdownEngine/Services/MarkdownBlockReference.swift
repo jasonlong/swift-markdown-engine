@@ -82,7 +82,7 @@ public enum MarkdownBlockReferenceSyntax {
         let probe = min(max(location - 1, 0), text.length)
         let lineRange = text.lineRange(for: NSRange(location: probe, length: 0))
         let expression = try! NSRegularExpression(
-            pattern: #"[ \t]\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
+            pattern: #"(?m)[ \t]\^[0-9abcdefghjkmnpqrstvwxyz]{26}(?=\r?$)"#
         )
         return expression.firstMatch(
             in: source,
