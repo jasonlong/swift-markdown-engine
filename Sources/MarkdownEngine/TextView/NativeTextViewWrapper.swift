@@ -114,6 +114,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Synchronously supplies a read-only visual surface for a resolved block
     /// reference. Returning `nil` keeps the portable token visible.
     public var blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    /// Invoked when the user clicks a task checkbox rendered inside a block
+    /// transclusion. The host updates the source block; the transclusion is
+    /// deliberately never edited in place.
+    public var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     /// When this value changes, the editor scrolls the source line carrying
     /// that durable ID into view and briefly highlights it. Hosts own graph
     /// navigation; the engine only performs local source reveal.
@@ -178,6 +182,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)? = nil,
+        onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         sourceBlockIDToReveal: String? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
@@ -209,6 +214,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
         self.blockReferencePresentation = blockReferencePresentation
+        self.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
@@ -328,6 +334,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
         textView.blockReferencePresentationProvider = blockReferencePresentation
+        textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
@@ -489,6 +496,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
 
         textView.onPasteImage = onPasteImage
         textView.blockReferencePresentationProvider = blockReferencePresentation
+        textView.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)

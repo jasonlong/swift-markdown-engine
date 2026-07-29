@@ -73,12 +73,32 @@ private final class BlockReferenceAttachmentCell: NSTextAttachmentCell {
         ).fill()
 
         let body = displayMarkdown
+        let taskOffset: CGFloat = presentation.isTaskComplete == nil ? 0 : 24
         let textRect = NSRect(
-            x: rect.minX + 16,
+            x: rect.minX + 16 + taskOffset,
             y: rect.minY + 8,
-            width: rect.width - 24,
+            width: rect.width - 24 - taskOffset,
             height: rect.height - 16
         )
+        if let complete = presentation.isTaskComplete {
+            let checkbox = NSRect(x: rect.minX + 15, y: rect.midY - 8, width: 16, height: 16)
+            accent.withAlphaComponent(0.15).setFill()
+            NSBezierPath(roundedRect: checkbox, xRadius: 4, yRadius: 4).fill()
+            accent.setStroke()
+            let outline = NSBezierPath(roundedRect: checkbox.insetBy(dx: 0.5, dy: 0.5), xRadius: 3.5, yRadius: 3.5)
+            outline.lineWidth = 1.5
+            outline.stroke()
+            if complete {
+                let checkmark = NSBezierPath()
+                checkmark.move(to: NSPoint(x: checkbox.minX + 3.5, y: checkbox.midY))
+                checkmark.line(to: NSPoint(x: checkbox.midX - 0.5, y: checkbox.minY + 4))
+                checkmark.line(to: NSPoint(x: checkbox.maxX - 3, y: checkbox.maxY - 4))
+                checkmark.lineWidth = 1.8
+                checkmark.lineCapStyle = .round
+                checkmark.lineJoinStyle = .round
+                checkmark.stroke()
+            }
+        }
         let sourceAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
             .foregroundColor: NSColor.secondaryLabelColor,
@@ -95,8 +115,8 @@ private final class BlockReferenceAttachmentCell: NSTextAttachmentCell {
 
     private var displayMarkdown: String {
         let stripped = presentation.markdown
-            .replacingOccurrences(of: "- [ ] ", with: "○ ")
-            .replacingOccurrences(of: "- [x] ", with: "✓ ")
+            .replacingOccurrences(of: "- [ ] ", with: "")
+            .replacingOccurrences(of: "- [x] ", with: "")
         return stripped.isEmpty ? statusLabel : stripped
     }
 
