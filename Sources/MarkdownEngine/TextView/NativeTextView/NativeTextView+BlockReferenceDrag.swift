@@ -31,14 +31,7 @@ extension NativeTextView {
 
     private func blockReferenceDragSelection(at point: CGPoint) -> MarkdownBlockReferenceDragSelection? {
         let index = characterIndexForInsertion(at: point)
-        let source = string as NSString
-        guard index >= 0, index < source.length else { return nil }
-        let line = source.lineRange(for: NSRange(location: index, length: 0))
-        let text = source.substring(with: line)
-        guard text.range(of: #"^[ \t]*(?:[-*+] |\d+[.)] )"#, options: .regularExpression) != nil else {
-            return nil
-        }
-        return MarkdownBlockReferenceDragSelection(location: line.location, length: line.length)
+        MarkdownBlockReferenceDragSyntax.sourceLineSelection(in: string, atUTF16: index)
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {

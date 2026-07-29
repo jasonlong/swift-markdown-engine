@@ -28,3 +28,19 @@ public struct MarkdownBlockReferenceDragPayload: Sendable {
         self.plainText = plainText
     }
 }
+
+public enum MarkdownBlockReferenceDragSyntax {
+    /// Returns the full source line for a draggable unordered or ordered list
+    /// item at a UTF-16 cursor position. Ordinary prose deliberately returns
+    /// `nil`, preserving normal text selection behavior.
+    public static func sourceLineSelection(in source: String, atUTF16 location: Int) -> MarkdownBlockReferenceDragSelection? {
+        let text = source as NSString
+        guard location >= 0, location < text.length else { return nil }
+        let line = text.lineRange(for: NSRange(location: location, length: 0))
+        let lineText = text.substring(with: line)
+        guard lineText.range(of: #"^[ \t]*(?:[-*+] |\d+[.)] )"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        return MarkdownBlockReferenceDragSelection(location: line.location, length: line.length)
+    }
+}
