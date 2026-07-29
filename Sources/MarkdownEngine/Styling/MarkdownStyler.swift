@@ -194,6 +194,13 @@ enum MarkdownStyler {
                 .kern: -0.1,
             ]))
         }
+        for token in MarkdownBlockReferenceSyntax.tokens(in: text) {
+            result.append((token.range, [
+                .link: "markdown-block-reference",
+                .foregroundColor: configuration.theme.link,
+                .spellingState: 0,
+            ]))
+        }
         PerfTrace.note { "  styleAttributes: ast=\(String(format: "%.2f", astMs))ms latex+img4=\(String(format: "%.2f", imgMs))ms styledRanges=\(result.count)" }
         return result
     }

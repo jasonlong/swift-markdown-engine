@@ -67,6 +67,17 @@ public enum MarkdownBlockReferenceSyntax {
         )?.range
     }
 
+    public static func editIntersectsTransclusion(_ edit: NSRange, in source: String) -> Bool {
+        tokens(in: source).contains { token in
+            guard token.kind == .transclusion else { return false }
+            if edit.length == 0 {
+                return edit.location >= token.range.location
+                    && edit.location <= NSMaxRange(token.range)
+            }
+            return NSIntersectionRange(edit, token.range).length > 0
+        }
+    }
+
     public static func tokens(in source: String) -> [MarkdownBlockReferenceToken] {
         let expression = try! NSRegularExpression(
             pattern: #"(?m)^\s*(!?)\[\[([^#\]|\r\n]+)#\^([0-9abcdefghjkmnpqrstvwxyz]{26})\]\]\s*$"#

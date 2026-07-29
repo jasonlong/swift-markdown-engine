@@ -37,3 +37,14 @@ import Testing
     )
     #expect((source as NSString).substring(with: try! #require(range)) == "- [ ] Ship it ^01hzy7vz8g4qj6m2n3r5t7w9xy")
 }
+
+@Test func transclusionEditsAreRejectedButBlockLinksRemainEditable() {
+    let transclusion = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+    let link = "[[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+    #expect(MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: 3, length: 0), in: transclusion
+    ))
+    #expect(!MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+        NSRange(location: 3, length: 0), in: link
+    ))
+}

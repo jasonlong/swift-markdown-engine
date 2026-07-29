@@ -786,6 +786,14 @@ extension NativeTextViewCoordinator {
             pendingPreEditActiveTokenIndices = nil
             return false
         }
+        if MarkdownBlockReferenceSyntax.editIntersectsTransclusion(
+            affectedCharRange,
+            in: preText
+        ) {
+            pendingEditedRange = nil
+            pendingPreEditActiveTokenIndices = nil
+            return false
+        }
         switch protectedListPrefixEditAction(
             affectedRange: affectedCharRange,
             replacement: replacementString,
@@ -912,6 +920,15 @@ extension NativeTextViewCoordinator {
         // Record that the delegate ran this press, so mouseDown's fallback knows
         // AppKit didn't drop the dispatch.
         (textView as? NativeTextView)?.linkClickDidFire = true
+        if let reference = MarkdownBlockReferenceSyntax.tokens(in: textView.string).first(where: {
+            NSLocationInRange(charIndex, $0.range)
+        }) {
+            (textView as? NativeTextView)?.linkClickDidNavigate = true
+            DispatchQueue.main.async {
+                self.onBlockReferenceOpen?(reference)
+            }
+            return true
+        }
         // Edit zone: a click on the outer ~30% of a link's first/last visible char places the caret
         // just outside the `[` / `)` markers to reveal the source for editing instead of navigating.
         // This applies only to web links [text](url).
