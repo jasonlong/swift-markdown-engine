@@ -51,6 +51,7 @@ final class NativeTextView: NSTextView {
     var onPasteImage: ((NSPasteboard) -> String?)?
     var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    var blockReferenceCardOverlay: BlockReferenceCardOverlay?
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?

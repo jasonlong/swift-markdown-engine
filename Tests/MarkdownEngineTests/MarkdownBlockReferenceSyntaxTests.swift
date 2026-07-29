@@ -99,8 +99,8 @@ import Testing
     coordinator.applyBlockReferencePresentations(to: textView)
 
     let anchor = 0
-    #expect(textView.textStorage?.attribute(.latexImage, at: anchor, effectiveRange: nil) is NSImage)
-    #expect(textView.textStorage?.attribute(.latexIsBlock, at: anchor, effectiveRange: nil) as? Bool == true)
+    #expect(textView.blockReferenceCardOverlay?.cards.count == 1)
+    #expect(textView.blockReferenceCardOverlay?.cards.first?.anchor.location == anchor)
     #expect((textView.textStorage?.attribute(.paragraphStyle, at: anchor, effectiveRange: nil)
         as? NSParagraphStyle)?.minimumLineHeight ?? 0 >= 48)
 }

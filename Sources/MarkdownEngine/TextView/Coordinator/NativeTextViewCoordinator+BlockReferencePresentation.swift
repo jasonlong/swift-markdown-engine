@@ -31,6 +31,7 @@ extension NativeTextViewCoordinator {
             storage.removeAttribute(.attachment, range: range)
             storage.removeAttribute(.markdownBlockReferenceSurface, range: range)
         }
+        var cards: [BlockReferenceCardOverlay.Card] = []
         for reference in references {
             guard let presentation = provider(reference), reference.range.length > 0 else { continue }
             let image = BlockReferenceAttachmentRenderer.image(
@@ -51,9 +52,6 @@ extension NativeTextViewCoordinator {
             let markerFont = NSFont.systemFont(ofSize: 0.1)
             let anchorText = (source as NSString).substring(with: anchor)
             storage.addAttributes([
-                .latexImage: image,
-                .latexBounds: NSValue(rect: NSRect(origin: .zero, size: imageSize)),
-                .latexIsBlock: true,
                 .markdownBlockReferenceSurface: true,
                 .foregroundColor: NSColor.clear,
                 .font: markerFont,
@@ -71,6 +69,23 @@ extension NativeTextViewCoordinator {
                     .kern: -HeadingHelpers.textWidth(tailText, font: markerFont),
                 ], range: tail)
             }
+            cards.append(.init(anchor: anchor, presentation: presentation, size: imageSize))
+        }
+        guard let nativeTextView = textView as? NativeTextView else { return }
+        let overlay = nativeTextView.blockReferenceCardOverlay ?? BlockReferenceCardOverlay()
+        if overlay.superview == nil {
+            overlay.frame = nativeTextView.bounds
+            overlay.autoresizingMask = [.width, .height]
+            nativeTextView.addSubview(overlay)
+            nativeTextView.blockReferenceCardOverlay = overlay
+        }
+        overlay.cards = cards
+        nativeTextView.needsDisplay = true
+        DispatchQueue.main.async { [weak nativeTextView, weak overlay] in
+            guard let nativeTextView, let overlay else { return }
+            nativeTextView.ensureVisibleLayout()
+            overlay.frame = nativeTextView.bounds
+            overlay.needsDisplay = true
         }
     }
 }
@@ -187,6 +202,47 @@ private final class BlockReferenceAttachmentCell: NSTextAttachmentCell {
         switch state {
         case .resolved: .controlAccentColor
         case .broken, .ambiguous, .duplicate, .cyclic: .systemOrange
+        }
+    }
+}
+
+final class BlockReferenceCardOverlay: NSView {
+    struct Card {
+        let anchor: NSRange
+        let presentation: MarkdownBlockReferencePresentation
+        let size: NSSize
+    }
+
+    var cards: [Card] = [] {
+        didSet { needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let textView = superview as? NativeTextView,
+              let bridge = textView.layoutBridge,
+              let textContainer = textView.textContainer
+        else { return }
+        for card in cards {
+            let anchorRect = bridge.boundingRect(
+                forCharacterRange: card.anchor,
+                in: textContainer
+            )
+            guard !anchorRect.isEmpty else { continue }
+            let frame = NSRect(
+                x: textView.textContainerOrigin.x + anchorRect.minX,
+                y: textView.textContainerOrigin.y + anchorRect.minY,
+                width: card.size.width,
+                height: card.size.height
+            )
+            guard frame.intersects(dirtyRect) else { continue }
+            BlockReferenceAttachmentCell(
+                presentation: card.presentation,
+                width: card.size.width
+            ).draw(withFrame: frame, in: self)
         }
     }
 }
