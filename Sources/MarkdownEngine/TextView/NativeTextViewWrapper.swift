@@ -118,6 +118,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// that durable ID into view and briefly highlights it. Hosts own graph
     /// navigation; the engine only performs local source reveal.
     public var sourceBlockIDToReveal: String?
+    /// A source-address occurrence to reveal after navigation. The value uses
+    /// the portable `Note#^block-id` shape; only local text matching happens
+    /// inside the engine.
+    public var blockReferenceAddressToReveal: String?
     /// Fires when the set of visible code blocks changes, so embedders can
     /// overlay copy buttons (see ``CodeBlockButton``).
     public var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
@@ -179,6 +183,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)? = nil,
         sourceBlockIDToReveal: String? = nil,
+        blockReferenceAddressToReveal: String? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
         placeholder: NSAttributedString? = nil,
@@ -210,6 +215,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onBlockReferenceOpen = onBlockReferenceOpen
         self.onBlockReferenceDrag = onBlockReferenceDrag
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
+        self.blockReferenceAddressToReveal = blockReferenceAddressToReveal
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
         self.placeholder = placeholder
@@ -664,6 +670,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         )
         context.coordinator.revealSourceBlockIfRequested(
             sourceBlockIDToReveal,
+            in: textView
+        )
+        context.coordinator.revealBlockReferenceIfRequested(
+            blockReferenceAddressToReveal,
             in: textView
         )
         textView.recalcOverscroll(for: nsView)

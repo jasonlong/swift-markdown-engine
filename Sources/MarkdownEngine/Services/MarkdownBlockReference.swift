@@ -67,6 +67,20 @@ public enum MarkdownBlockReferenceSyntax {
         )?.range
     }
 
+    /// Finds the complete reference line for a particular source address. This
+    /// lets a host reveal the occurrence the user selected from a source
+    /// block's reference list without teaching the engine about graph paths.
+    public static func lineRange(
+        forReferenceTo noteTarget: String,
+        blockID: String,
+        in source: String
+    ) -> NSRange? {
+        guard MarkdownBlockIDShape.isValid(blockID) else { return nil }
+        return tokens(in: source).first(where: {
+            $0.noteTarget == noteTarget && $0.blockID == blockID
+        })?.range
+    }
+
     public static func editIntersectsTransclusion(_ edit: NSRange, in source: String) -> Bool {
         tokens(in: source).contains { token in
             guard token.kind == .transclusion else { return false }

@@ -78,6 +78,7 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     var onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
     var lastRevealedSourceBlock: (documentID: String?, id: String)?
+    var lastRevealedBlockReference: (documentID: String?, address: String)?
     var onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)?
     var didInitialFormatting: Bool = false
     /// One-shot guard so `updateCodeBlockSelection` only forces a full-document layout once per document.
