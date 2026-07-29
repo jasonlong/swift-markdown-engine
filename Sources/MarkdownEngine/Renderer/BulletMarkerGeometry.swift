@@ -14,9 +14,11 @@ enum BulletMarkerGeometry {
 
     /// Baseline produced by TextKit for a rendered list item's first line.
     /// List paragraphs use the font's natural line height with extra leading
-    /// as lineSpacing (below the line), so the first baseline is AppKit's
-    /// default baseline offset for the font.
+    /// as lineSpacing (below the line). TextKit positions the hidden list
+    /// prefix after consuming the font's intrinsic leading, so virtual empty
+    /// list markers must mirror that offset rather than using AppKit's raw
+    /// default baseline.
     static func listBaselineY(for font: NSFont) -> CGFloat {
-        NSLayoutManager().defaultBaselineOffset(for: font)
+        NSLayoutManager().defaultBaselineOffset(for: font) - font.leading
     }
 }
