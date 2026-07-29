@@ -35,6 +35,7 @@ extension NativeTextView {
         if let toggled = toggleTaskCheckboxIfHit(event: event), toggled { return }
         if toggleBlockReferenceTaskIfHit(event: event) { return }
         if openBlockReferenceIfHit(event: event) { return }
+        if beginBlockReferenceDragIfHit(event: event) { return }
         if remapClickInParagraphSpacing(event: event) { return }
         dragStartMouseScreenLoc = NSEvent.mouseLocation
         let boostTimer = Timer(timeInterval: 1.0 / configuration.dragSelection.ticksPerSecond, repeats: true) { [weak self] _ in

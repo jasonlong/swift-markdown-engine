@@ -52,6 +52,7 @@ final class NativeTextView: NSTextView {
     var blockReferencePresentationProvider: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
     var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
+    var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
     var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
     var wikiLinkHoverTrackingArea: NSTrackingArea?
     var hoveredWikiLinkRange: NSRange?
