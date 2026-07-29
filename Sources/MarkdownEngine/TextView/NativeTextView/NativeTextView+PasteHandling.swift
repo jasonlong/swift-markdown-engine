@@ -87,7 +87,7 @@ extension NativeTextView {
     /// Insert pasted text, extending the `>` prefix to every line when the
     /// caret sits on a blockquote line — so a multi-line paste stays quoted
     /// instead of only its first line landing after the existing marker.
-    private func insertPreservingBlockquote(_ text: String) {
+    func insertPreservingBlockquote(_ text: String) {
         let sel = selectedRange()
         var prepared = MarkdownLists.blockquoteContinuedPaste(text, at: sel.location, in: string)
         // A paste ENDING in a table row would park the caret inside the table,
@@ -106,7 +106,7 @@ extension NativeTextView {
         return t.count >= 3 && t.hasPrefix("|") && t.hasSuffix("|")
     }
 
-    private func insertBlockEmbed(_ embed: String) {
+    func insertBlockEmbed(_ embed: String) {
         let sel = selectedRange()
         let nsText = string as NSString
         var prefix = ""

@@ -111,6 +111,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Invoked when a user activates a full-line reference token. The host
     /// resolves navigation; the engine does not know graph paths or titles.
     public var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
+    /// Asynchronously creates a portable drag payload for a source list row.
+    /// The engine owns the gesture; the host owns identity assignment and data.
+    public var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
     /// When this value changes, the editor scrolls the source line carrying
     /// that durable ID into view and briefly highlights it. Hosts own graph
     /// navigation; the engine only performs local source reveal.
@@ -174,6 +177,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
+        onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)? = nil,
         sourceBlockIDToReveal: String? = nil,
         onCodeBlockSelectionChange: (([CodeBlockSelection]) -> Void)? = nil,
         onSpellCheckingPolicyChanged: ((SpellCheckingPolicy) -> Void)? = nil,
@@ -204,6 +208,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onInlinePreviewKey = onInlinePreviewKey
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
+        self.onBlockReferenceDrag = onBlockReferenceDrag
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
         self.onCodeBlockSelectionChange = onCodeBlockSelectionChange
         self.onSpellCheckingPolicyChanged = onSpellCheckingPolicyChanged
@@ -322,6 +327,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.isAutomaticDataDetectionEnabled = true
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.onPasteImage = onPasteImage
+        textView.onBlockReferenceDrag = onBlockReferenceDrag
         textView.onWikiLinkHover = onWikiLinkHover
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         if #available(macOS 15.1, *) {
@@ -482,6 +488,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         }
 
         textView.onPasteImage = onPasteImage
+        textView.onBlockReferenceDrag = onBlockReferenceDrag
         textView.isCursorExcluded = isCursorExcluded
         textView.emptyDocumentPrefix = emptyDocumentPrefix
         textView.setPlaceholder(placeholder)
