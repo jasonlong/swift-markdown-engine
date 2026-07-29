@@ -412,6 +412,9 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.recalcOverscroll(for: scrollView)
         textView.setPlaceholder(placeholder)
         textView.updateBlockReferenceSurfaces()
+        DispatchQueue.main.async { [weak textView] in
+            textView?.updateBlockReferenceSurfaces()
+        }
         // Initial reading-column centering; the resize observer below handles later changes.
         if configuration.readingWidth != nil {
             textView.centerReadingColumn(forClipWidth: scrollView.contentView.bounds.width)
@@ -432,6 +435,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
                 }
                 context.coordinator.didEnsureLayoutForCurrentDocument = false
                 context.coordinator.updateCodeBlockSelection(textView: textView)
+                textView.updateBlockReferenceSurfaces()
             }
             // Only react with overscroll recalc when the viewport itself resizes
             // (window resize). Without this guard, TextKit-induced frame changes echo

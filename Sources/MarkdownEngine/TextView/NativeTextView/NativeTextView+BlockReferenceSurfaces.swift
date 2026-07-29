@@ -28,7 +28,7 @@ extension NativeTextView {
         let fullRange = NSRange(location: 0, length: storage.length)
         restoreBlockReferenceParagraphs(in: storage, fullRange: fullRange)
 
-        let availableWidth = max(1, bounds.width - textContainerInset.width * 2)
+        let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
         var pending: [(token: MarkdownBlockReferenceToken, surface: MarkdownBlockReferenceSurface)] = []
         storage.beginEditing()
         for token in MarkdownBlockReferenceSyntax.tokens(in: source) where token.kind == .transclusion {
@@ -57,7 +57,9 @@ extension NativeTextView {
         storage.endEditing()
 
         guard !pending.isEmpty else { return }
-        ensureVisibleLayout()
+        if let textLayoutManager {
+            textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+        }
 
         for entry in pending {
             let tokenRect = layoutBridge.boundingRect(forCharacterRange: entry.token.range, in: textContainer)
