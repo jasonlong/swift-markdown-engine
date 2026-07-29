@@ -116,6 +116,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
     /// Invoked when a user activates a full-line reference token. The host
     /// resolves navigation; the engine does not know graph paths or titles.
     public var onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)?
+    /// Immutable display data retained for a future host-view presentation.
+    /// This recovery baseline intentionally leaves the canonical token visible.
+    public var blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)?
+    /// Receives task activation from a future host-supplied reference surface.
+    public var onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)?
     /// Asynchronously creates a portable drag payload for a source list row.
     /// The engine owns the gesture; the host owns identity assignment and data.
     public var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
@@ -187,6 +192,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         onInlinePreviewKey: ((InlinePreviewKey) -> Bool)? = nil,
         onBlockReferenceSelectionChange: ((MarkdownBlockReferenceToken?) -> Void)? = nil,
         onBlockReferenceOpen: ((MarkdownBlockReferenceToken) -> Void)? = nil,
+        blockReferencePresentation: ((MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?)? = nil,
+        onBlockReferenceTaskToggle: ((MarkdownBlockReferenceToken) -> Void)? = nil,
         onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)? = nil,
         sourceBlockIDToReveal: String? = nil,
         blockReferenceAddressToReveal: String? = nil,
@@ -220,6 +227,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         self.onInlinePreviewKey = onInlinePreviewKey
         self.onBlockReferenceSelectionChange = onBlockReferenceSelectionChange
         self.onBlockReferenceOpen = onBlockReferenceOpen
+        self.blockReferencePresentation = blockReferencePresentation
+        self.onBlockReferenceTaskToggle = onBlockReferenceTaskToggle
         self.onBlockReferenceDrag = onBlockReferenceDrag
         self.sourceBlockIDToReveal = sourceBlockIDToReveal
         self.blockReferenceAddressToReveal = blockReferenceAddressToReveal
