@@ -49,6 +49,7 @@ final class NativeTextView: NSTextView {
 
     // MARK: Editor wiring
     var onPasteImage: ((NSPasteboard) -> String?)?
+    var blockReferencePasteResult: ((NSPasteboard) -> MarkdownBlockReferencePasteResult)?
     var onBlockReferenceDrag: (@MainActor (MarkdownBlockReferenceDragSelection) async -> MarkdownBlockReferenceDragPayload?)?
     var onWikiLinkHover: ((WikiLinkHoverState?) -> Void)?
     var wikiLinkHoverTrackingArea: NSTrackingArea?

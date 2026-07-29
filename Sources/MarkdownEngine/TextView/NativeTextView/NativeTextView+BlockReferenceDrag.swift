@@ -35,11 +35,23 @@ extension NativeTextView {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        guard isEditable,
-              let onPasteImage,
-              onPasteImage(sender.draggingPasteboard) != nil
-        else { return super.draggingEntered(sender) }
-        return .copy
+        guard isEditable else { return super.draggingEntered(sender) }
+        let pasteboard = sender.draggingPasteboard
+        switch blockReferencePasteResult?(pasteboard) ?? .notHandled {
+        case .insertReference:
+            return .copy
+        case .rejected:
+            // Option-drag intentionally asks for the independent plain-text
+            // fallback; an ordinary self/cyclic drag must not fall through.
+            return NSEvent.modifierFlags.contains(.option) && pasteboard.string(forType: .string) != nil
+                ? .copy
+                : []
+        case .notHandled:
+            guard let onPasteImage, onPasteImage(pasteboard) != nil else {
+                return super.draggingEntered(sender)
+            }
+            return .copy
+        }
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
@@ -53,6 +65,17 @@ extension NativeTextView {
             insertPreservingBlockquote(plain)
             undoManager?.setActionName("Copy Block")
             return true
+        }
+        switch blockReferencePasteResult?(pasteboard) ?? .notHandled {
+        case .insertReference(let reference):
+            insertBlockEmbed(reference)
+            undoManager?.setActionName("Insert Block Reference")
+            return true
+        case .rejected:
+            NSSound.beep()
+            return false
+        case .notHandled:
+            break
         }
         if let reference = onPasteImage?(pasteboard), !reference.isEmpty {
             insertBlockEmbed(reference)
