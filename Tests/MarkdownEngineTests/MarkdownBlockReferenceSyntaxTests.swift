@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import MarkdownEngine
 
@@ -70,6 +72,37 @@ import Testing
     #expect(presentation.sourceLabel == "Weekly")
     #expect(presentation.markdown == "- [ ] Ship it")
     #expect(presentation.isTaskComplete == false)
+}
+
+@MainActor
+@Test func renderedBlockReferenceReservesAndTagsItsFullLine() {
+    let source = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+    let textView = NativeTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
+    textView.string = source
+    textView.blockReferencePresentationProvider = { _ in
+        MarkdownBlockReferencePresentation(
+            state: .resolved,
+            sourceLabel: "Weekly",
+            markdown: "- [ ] Ship it",
+            isTaskComplete: false
+        )
+    }
+    let coordinator = NativeTextViewCoordinator(
+        text: .constant(source),
+        fontName: "SF Pro",
+        fontSize: 16,
+        isWikiLinkActive: .constant(false),
+        onLinkClick: nil,
+        onInlineSelectionChange: nil
+    )
+
+    coordinator.applyBlockReferencePresentations(to: textView)
+
+    let anchor = 0
+    #expect(textView.textStorage?.attribute(.latexImage, at: anchor, effectiveRange: nil) is NSImage)
+    #expect(textView.textStorage?.attribute(.latexIsBlock, at: anchor, effectiveRange: nil) as? Bool == true)
+    #expect((textView.textStorage?.attribute(.paragraphStyle, at: anchor, effectiveRange: nil)
+        as? NSParagraphStyle)?.minimumLineHeight ?? 0 >= 48)
 }
 
 @Test func blockReferenceDragOnlyRecognizesSourceListRows() {

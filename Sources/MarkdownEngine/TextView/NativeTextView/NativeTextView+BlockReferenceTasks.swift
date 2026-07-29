@@ -17,7 +17,7 @@ extension NativeTextView {
             y: viewPoint.y - textContainerOrigin.y
         )
         let characterIndex = characterIndexForInsertion(at: viewPoint)
-        guard let reference = MarkdownBlockReferenceSyntax.tokens(in: markdownSourceWithBlockReferenceMarkers()).first(where: {
+        guard let reference = MarkdownBlockReferenceSyntax.tokens(in: string).first(where: {
             NSLocationInRange(characterIndex, $0.range)
         }), let presentation = provider(reference), presentation.isTaskComplete != nil
         else { return false }
@@ -41,7 +41,7 @@ extension NativeTextView {
         else { return false }
         let point = convert(event.locationInWindow, from: nil)
         let characterIndex = characterIndexForInsertion(at: point)
-        guard let reference = MarkdownBlockReferenceSyntax.tokens(in: markdownSourceWithBlockReferenceMarkers()).first(where: {
+        guard let reference = MarkdownBlockReferenceSyntax.tokens(in: string).first(where: {
             NSLocationInRange(characterIndex, $0.range)
         }), provider(reference) != nil
         else { return false }

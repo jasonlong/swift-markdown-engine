@@ -1,31 +1,7 @@
 import AppKit
 
-extension NSAttributedString.Key {
+private extension NSAttributedString.Key {
     static let markdownBlockReferenceSurface = NSAttributedString.Key("MarkdownEngine.blockReferenceSurface")
-}
-
-extension NSTextView {
-    /// Rendered block references replace only their leading `!` with AppKit's
-    /// attachment character. Recover that marker before parsing or saving so
-    /// the editor's visible surface never changes the portable Markdown.
-    func markdownSourceWithBlockReferenceMarkers() -> String {
-        guard let storage = textStorage,
-              string.utf16.contains(0xFFFC)
-        else { return string }
-        let source = NSMutableString(string: string)
-        let fullRange = NSRange(location: 0, length: source.length)
-        storage.enumerateAttribute(
-            NSAttributedString.Key.markdownBlockReferenceSurface,
-            in: fullRange
-        ) { value, range, _ in
-            guard value != nil,
-                  range.location < source.length,
-                  source.character(at: range.location) == 0xFFFC
-            else { return }
-            source.replaceCharacters(in: NSRange(location: range.location, length: 1), with: "!")
-        }
-        return source as String
-    }
 }
 
 extension NativeTextViewCoordinator {
@@ -35,47 +11,82 @@ extension NativeTextViewCoordinator {
               let storage = textView.textStorage
         else { return }
 
-        let source = textView.markdownSourceWithBlockReferenceMarkers()
+        let source = textView.string
         let references = MarkdownBlockReferenceSyntax.tokens(in: source)
         let availableWidth = max(180, textView.bounds.width - textView.textContainerInset.width * 2)
         storage.beginEditing()
         defer { storage.endEditing() }
         let fullRange = NSRange(location: 0, length: storage.length)
+        var priorRanges: [NSRange] = []
         storage.enumerateAttribute(
             .markdownBlockReferenceSurface,
             in: fullRange
         ) { value, range, _ in
-            guard value != nil,
-                  range.location < storage.length,
-                  storage.attribute(.attachment, at: range.location, effectiveRange: nil) != nil
-            else { return }
-            storage.replaceCharacters(in: NSRange(location: range.location, length: 1), with: "!")
+            if value != nil { priorRanges.append(range) }
         }
-        storage.removeAttribute(.attachment, range: fullRange)
-        storage.removeAttribute(.markdownBlockReferenceSurface, range: fullRange)
+        for range in priorRanges {
+            storage.removeAttribute(.latexImage, range: range)
+            storage.removeAttribute(.latexBounds, range: range)
+            storage.removeAttribute(.latexIsBlock, range: range)
+            storage.removeAttribute(.attachment, range: range)
+            storage.removeAttribute(.markdownBlockReferenceSurface, range: range)
+        }
         for reference in references {
             guard let presentation = provider(reference), reference.range.length > 0 else { continue }
-            let attachment = NSTextAttachment()
-            attachment.attachmentCell = BlockReferenceAttachmentCell(
+            let image = BlockReferenceAttachmentRenderer.image(
                 presentation: presentation,
                 width: availableWidth
             )
-            let anchor = NSRange(location: reference.range.location, length: 1)
-            storage.replaceCharacters(in: anchor, with: "\u{FFFC}")
-            storage.addAttribute(.attachment, value: attachment, range: anchor)
-            storage.addAttribute(.markdownBlockReferenceSurface, value: true, range: reference.range)
-            let hiddenTail = NSRange(
-                location: reference.range.location + 1,
-                length: reference.range.length - 1
-            )
-            if hiddenTail.length > 0 {
+            let referenceText = (source as NSString).substring(with: reference.range)
+            let leadingWhitespace = referenceText.utf16.prefix { $0 == 0x20 || $0 == 0x09 }.count
+            let anchor = NSRange(location: reference.range.location + leadingWhitespace, length: 1)
+            let imageSize = image.size
+            let paragraphRange = (source as NSString).paragraphRange(for: reference.range)
+            let paragraph = (storage.attribute(.paragraphStyle, at: anchor.location, effectiveRange: nil)
+                as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+            paragraph.minimumLineHeight = max(paragraph.minimumLineHeight, imageSize.height)
+            paragraph.maximumLineHeight = max(paragraph.maximumLineHeight, imageSize.height)
+            paragraph.lineBreakMode = .byClipping
+            storage.addAttribute(.paragraphStyle, value: paragraph, range: paragraphRange)
+            let markerFont = NSFont.systemFont(ofSize: 0.1)
+            let anchorText = (source as NSString).substring(with: anchor)
+            storage.addAttributes([
+                .latexImage: image,
+                .latexBounds: NSValue(rect: NSRect(origin: .zero, size: imageSize)),
+                .latexIsBlock: true,
+                .markdownBlockReferenceSurface: true,
+                .foregroundColor: NSColor.clear,
+                .font: markerFont,
+                .kern: imageSize.width - HeadingHelpers.textWidth(anchorText, font: markerFont),
+            ], range: anchor)
+            let tailStart = anchor.location + 1
+            let tailLength = NSMaxRange(reference.range) - tailStart
+            if tailLength > 0 {
+                let tail = NSRange(location: tailStart, length: tailLength)
+                let tailText = (source as NSString).substring(with: tail)
                 storage.addAttributes([
-                    .font: NSFont.systemFont(ofSize: 0.1),
+                    .markdownBlockReferenceSurface: true,
                     .foregroundColor: NSColor.clear,
-                    .kern: -0.1,
-                ], range: hiddenTail)
+                    .font: markerFont,
+                    .kern: -HeadingHelpers.textWidth(tailText, font: markerFont),
+                ], range: tail)
             }
         }
+    }
+}
+
+private enum BlockReferenceAttachmentRenderer {
+    static func image(
+        presentation: MarkdownBlockReferencePresentation,
+        width: CGFloat
+    ) -> NSImage {
+        let cell = BlockReferenceAttachmentCell(presentation: presentation, width: width)
+        let size = cell.cellSize()
+        let image = NSImage(size: size)
+        image.lockFocus()
+        cell.draw(withFrame: NSRect(origin: .zero, size: size), in: nil)
+        image.unlockFocus()
+        return image
     }
 }
 

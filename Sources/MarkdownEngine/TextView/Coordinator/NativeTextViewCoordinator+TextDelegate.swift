@@ -105,7 +105,7 @@ extension NativeTextViewCoordinator {
 
 
         let rawSelRange = tv.selectedRange()
-        let docString = tv.markdownSourceWithBlockReferenceMarkers()
+        let docString = tv.string
         let fullText = docString as NSString
         let fullLength = fullText.length
         guard !tv.hasMarkedText() else { return }
@@ -168,14 +168,13 @@ extension NativeTextViewCoordinator {
 
         if !wtActive {
             let storageState = PerfTrace.measure("wiki") {
-                let hasRenderedBlockReferences = tv.string.utf16.contains(0xFFFC)
-                return (hasRenderedBlockReferences ? nil : WikiLinkService.updatedStorageState(
+                WikiLinkService.updatedStorageState(
                     displayText: docString,
                     editedRange: editedRange,
                     changeInLength: lengthDelta,
                     previousStorage: lastComputedStorage,
                     previousMetadata: wikiLinkMetadata
-                )) ?? WikiLinkService.makeStorageState(
+                ) ?? WikiLinkService.makeStorageState(
                     from: docString,
                     existingMetadata: wikiLinkMetadata,
                     textStorage: tv.textStorage
@@ -714,7 +713,7 @@ extension NativeTextViewCoordinator {
         // ONE bridge of the pre-edit text — every `textView.string` read is an
         // O(doc) copy of the mutable backing store; this function used to take
         // four of them per keystroke.
-        let preText = textView.markdownSourceWithBlockReferenceMarkers()
+        let preText = textView.string
         let preNS = preText as NSString
         // Open the keystroke's PERF frame HERE: the pre-edit parse and the
         // smart-input interceptors below used to run before the frame existed
