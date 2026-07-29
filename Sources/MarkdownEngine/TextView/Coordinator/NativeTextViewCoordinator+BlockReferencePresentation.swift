@@ -1,7 +1,31 @@
 import AppKit
 
-private extension NSAttributedString.Key {
+extension NSAttributedString.Key {
     static let markdownBlockReferenceSurface = NSAttributedString.Key("MarkdownEngine.blockReferenceSurface")
+}
+
+extension NSTextView {
+    /// Rendered block references replace only their leading `!` with AppKit's
+    /// attachment character. Recover that marker before parsing or saving so
+    /// the editor's visible surface never changes the portable Markdown.
+    func markdownSourceWithBlockReferenceMarkers() -> String {
+        guard let storage = textStorage,
+              string.utf16.contains(0xFFFC)
+        else { return string }
+        let source = NSMutableString(string: string)
+        let fullRange = NSRange(location: 0, length: source.length)
+        storage.enumerateAttribute(
+            NSAttributedString.Key.markdownBlockReferenceSurface,
+            in: fullRange
+        ) { value, range, _ in
+            guard value != nil,
+                  range.location < source.length,
+                  source.character(at: range.location) == 0xFFFC
+            else { return }
+            source.replaceCharacters(in: NSRange(location: range.location, length: 1), with: "!")
+        }
+        return source as String
+    }
 }
 
 extension NativeTextViewCoordinator {
@@ -11,12 +35,24 @@ extension NativeTextViewCoordinator {
               let storage = textView.textStorage
         else { return }
 
-        let source = textView.string
+        let source = textView.markdownSourceWithBlockReferenceMarkers()
         let references = MarkdownBlockReferenceSyntax.tokens(in: source)
-        guard !references.isEmpty else { return }
         let availableWidth = max(180, textView.bounds.width - textView.textContainerInset.width * 2)
         storage.beginEditing()
         defer { storage.endEditing() }
+        let fullRange = NSRange(location: 0, length: storage.length)
+        storage.enumerateAttribute(
+            .markdownBlockReferenceSurface,
+            in: fullRange
+        ) { value, range, _ in
+            guard value != nil,
+                  range.location < storage.length,
+                  storage.attribute(.attachment, at: range.location, effectiveRange: nil) != nil
+            else { return }
+            storage.replaceCharacters(in: NSRange(location: range.location, length: 1), with: "!")
+        }
+        storage.removeAttribute(.attachment, range: fullRange)
+        storage.removeAttribute(.markdownBlockReferenceSurface, range: fullRange)
         for reference in references {
             guard let presentation = provider(reference), reference.range.length > 0 else { continue }
             let attachment = NSTextAttachment()
@@ -25,6 +61,7 @@ extension NativeTextViewCoordinator {
                 width: availableWidth
             )
             let anchor = NSRange(location: reference.range.location, length: 1)
+            storage.replaceCharacters(in: anchor, with: "\u{FFFC}")
             storage.addAttribute(.attachment, value: attachment, range: anchor)
             storage.addAttribute(.markdownBlockReferenceSurface, value: true, range: reference.range)
             let hiddenTail = NSRange(
