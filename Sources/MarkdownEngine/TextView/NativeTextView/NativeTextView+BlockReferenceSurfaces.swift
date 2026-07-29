@@ -60,6 +60,10 @@ extension NativeTextView {
         if let textLayoutManager {
             textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
         }
+        if let scrollView = enclosingScrollView {
+            recalcOverscroll(for: scrollView, debugTag: "blockReferenceSurface")
+            (scrollView as? ClampedScrollView)?.clampToInsets()
+        }
 
         for entry in pending {
             let tokenRect = layoutBridge.boundingRect(forCharacterRange: entry.token.range, in: textContainer)
@@ -72,6 +76,7 @@ extension NativeTextView {
             )
             entry.surface.view.frame = frame.integral
             host.addSubview(entry.surface.view, positioned: .above, relativeTo: self)
+            entry.surface.view.needsDisplay = true
             blockReferenceSurfaceViews.append(entry.surface.view)
         }
     }
