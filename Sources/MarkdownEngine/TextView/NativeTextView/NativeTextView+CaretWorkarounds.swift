@@ -223,7 +223,7 @@ extension NativeTextView {
         let indicators = subviews.filter { type(of: $0) == NSTextInsertionIndicator.self }
         guard !indicators.isEmpty else { return }
 
-        var hide = false
+        var hide = shouldSuppressNativeInsertionPointForBlockReference()
         var resize = false
         if let ts = textStorage {
             let sel = selectedRange()

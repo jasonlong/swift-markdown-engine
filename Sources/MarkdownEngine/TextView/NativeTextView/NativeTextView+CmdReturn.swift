@@ -56,6 +56,7 @@ extension NativeTextView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if handleBlockReferenceTab(event) { return true }
         if handleFocusedCommandReturnKeyEquivalent(event) { return true }
         return super.performKeyEquivalent(with: event)
     }

@@ -420,4 +420,69 @@ struct BlockReferenceSurfaceTests {
         #expect(textView.selectedRange() == updatedSecondToken.range)
         #expect(textView.selectedRange() != updatedFirstToken.range)
     }
+
+    @Test("copied surface frames preserve source indentation")
+    func copiedSurfaceFramesPreserveSourceIndentation() throws {
+        _ = NSApplication.shared
+        let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+        let reference = "![[Weekly#^\(id)]]"
+        let source = "\(reference)\n\t\t\(reference)"
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 180))
+        let container = NativeTextViewContainer(frame: root.bounds)
+        let textView = NativeTextView(frame: root.bounds)
+        root.addSubview(container)
+        container.textView = textView
+        container.addSubview(textView)
+        textView.configuration.lists.indentPerLevel = 32
+        textView.string = source
+        let layoutBridge = LayoutBridge(
+            try #require(textView.textLayoutManager)
+        )
+        textView.layoutBridge = layoutBridge
+        textView.blockReferencePresentationProvider = { _ in
+            MarkdownBlockReferencePresentation(
+                state: .resolved,
+                sourceLabel: "Weekly",
+                markdown: "- Ship the release"
+            )
+        }
+        var surfaces: [ProofSurface] = []
+        textView.blockReferenceSurfaceProvider = { _, _, _ in
+            let surface = ProofSurface()
+            surfaces.append(surface)
+            return MarkdownBlockReferenceSurface(view: surface, height: 24)
+        }
+
+        root.layoutSubtreeIfNeeded()
+        textView.updateBlockReferenceSurfaces()
+
+        #expect(surfaces.count == 2)
+        let rootSurface = try #require(surfaces.first)
+        let nestedSurface = try #require(surfaces.last)
+        #expect(abs(nestedSurface.frame.minX - rootSurface.frame.minX - 64) < 1)
+        #expect(abs(nestedSurface.frame.width - rootSurface.frame.width + 64) < 1)
+    }
+
+    @Test("native caret is suppressed at copied-node boundaries")
+    func nativeCaretIsSuppressedAtCopiedNodeBoundaries() throws {
+        let source = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]\nAfter"
+        let textView = NativeTextView(frame: .zero)
+        textView.string = source
+        let token = try #require(
+            MarkdownBlockReferenceSyntax.tokens(in: source).first
+        )
+
+        textView.setSelectedRange(
+            NSRange(location: token.range.location, length: 0)
+        )
+        #expect(textView.shouldSuppressNativeInsertionPointForBlockReference())
+        textView.setSelectedRange(
+            NSRange(location: NSMaxRange(token.range), length: 0)
+        )
+        #expect(textView.shouldSuppressNativeInsertionPointForBlockReference())
+        textView.setSelectedRange(
+            NSRange(location: NSMaxRange(token.range) + 1, length: 0)
+        )
+        #expect(!textView.shouldSuppressNativeInsertionPointForBlockReference())
+    }
 }

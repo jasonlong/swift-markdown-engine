@@ -31,11 +31,21 @@ extension NativeTextView {
         let sourceNSString = source as NSString
 
         let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
-        var pending: [(token: MarkdownBlockReferenceToken, surface: MarkdownBlockReferenceSurface)] = []
+        var pending: [(
+            token: MarkdownBlockReferenceToken,
+            surface: MarkdownBlockReferenceSurface,
+            visualIndent: CGFloat,
+            availableWidth: CGFloat
+        )] = []
         storage.beginEditing()
         for token in MarkdownBlockReferenceSyntax.tokens(in: source) where token.kind == .transclusion {
+            let visualIndent = blockReferenceVisualIndent(
+                for: token,
+                in: sourceNSString
+            )
+            let surfaceWidth = max(1, availableWidth - visualIndent)
             guard let presentation = presentationProvider(token),
-                  let surface = surfaceProvider(token, presentation, availableWidth),
+                  let surface = surfaceProvider(token, presentation, surfaceWidth),
                   token.range.length > 0
             else { continue }
 
@@ -77,7 +87,7 @@ extension NativeTextView {
                 .font: NSFont.systemFont(ofSize: 0.1),
                 .kern: -0.1,
             ], range: token.range)
-            pending.append((token, surface))
+            pending.append((token, surface, visualIndent, surfaceWidth))
         }
         storage.endEditing()
 
@@ -94,9 +104,10 @@ extension NativeTextView {
             let tokenRect = layoutBridge.boundingRect(forCharacterRange: entry.token.range, in: textContainer)
             guard !tokenRect.isEmpty else { continue }
             let frame = NSRect(
-                x: frame.minX + textContainerOrigin.x + tokenRect.minX,
+                x: frame.minX + textContainerOrigin.x
+                    + entry.visualIndent,
                 y: frame.minY + textContainerOrigin.y + tokenRect.minY,
-                width: availableWidth,
+                width: entry.availableWidth,
                 height: entry.surface.height
             )
             entry.surface.view.frame = frame.integral
@@ -122,6 +133,21 @@ extension NativeTextView {
             )
         }
         updateBlockReferenceSurfaceSelectionStates()
+    }
+
+    /// The source token has a near-zero rendering font, so TextKit cannot be
+    /// trusted to preserve the advance of leading tabs. Reconstruct the same
+    /// grid indentation ordinary list rows use, then give the host surface the
+    /// remaining usable width for wrapping.
+    private func blockReferenceVisualIndent(
+        for token: MarkdownBlockReferenceToken,
+        in source: NSString
+    ) -> CGFloat {
+        let lineRange = source.lineRange(for: token.range)
+        let line = source.substring(with: lineRange)
+        let leading = String(line.prefix { $0 == " " || $0 == "\t" })
+        return CGFloat(MarkdownLists.indentLevel(from: leading))
+            * configuration.lists.indentPerLevel
     }
 
     func removeBlockReferenceSurfaces() {
@@ -246,6 +272,11 @@ extension NativeTextView {
                 )
             )
         }
+    }
+
+    func shouldSuppressNativeInsertionPointForBlockReference() -> Bool {
+        let selection = selectedRange()
+        return selection.length == 0 && blockReferenceToken(for: selection) != nil
     }
 
     func handleBlockReferenceSurfaceInteraction(
