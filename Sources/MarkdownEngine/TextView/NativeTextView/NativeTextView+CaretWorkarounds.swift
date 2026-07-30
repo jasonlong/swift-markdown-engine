@@ -15,20 +15,34 @@ extension NativeTextView {
     /// the real blank line so a user can intentionally reveal and edit it.
     override func moveDown(_ sender: Any?) {
         let selection = selectedRange()
-        let compactedRun = selection.length == 0
-            ? compactedBlankRun(after: selection.location)
-            : nil
+        if selection.length == 0,
+           let compactedRun = compactedBlankRun(after: selection.location),
+           caretIsOnVisualEdge(at: selection.location, movingDown: true),
+           let destination = caretLocation(
+               from: selection.location,
+               skipping: compactedRun,
+               movingDown: true
+           ) {
+            moveCaretDirectly(to: destination)
+            return
+        }
         super.moveDown(sender)
-        skipCompactedBlankRunIfNeeded(compactedRun, movingDown: true, sender: sender)
     }
 
     override func moveUp(_ sender: Any?) {
         let selection = selectedRange()
-        let compactedRun = selection.length == 0
-            ? compactedBlankRun(before: selection.location)
-            : nil
+        if selection.length == 0,
+           let compactedRun = compactedBlankRun(before: selection.location),
+           caretIsOnVisualEdge(at: selection.location, movingDown: false),
+           let destination = caretLocation(
+               from: selection.location,
+               skipping: compactedRun,
+               movingDown: false
+           ) {
+            moveCaretDirectly(to: destination)
+            return
+        }
         super.moveUp(sender)
-        skipCompactedBlankRunIfNeeded(compactedRun, movingDown: false, sender: sender)
     }
 
     private func compactedBlankRun(after location: Int) -> NSRange? {
@@ -85,23 +99,114 @@ extension NativeTextView {
         return hasCompactedLine ? run : nil
     }
 
-    private func skipCompactedBlankRunIfNeeded(
-        _ run: NSRange?,
-        movingDown: Bool,
-        sender: Any?
-    ) {
-        guard let run else { return }
-        var attempts = max(1, run.length + 1)
-        while attempts > 0,
-              selectedRange().length == 0,
-              NSLocationInRange(selectedRange().location, run) {
-            if movingDown {
-                super.moveDown(sender)
-            } else {
-                super.moveUp(sender)
-            }
-            attempts -= 1
+    private func caretIsOnVisualEdge(
+        at location: Int,
+        movingDown: Bool
+    ) -> Bool {
+        guard let textLayoutManager,
+              let contentStorage = textLayoutManager.textContentManager
+                as? NSTextContentStorage,
+              let textLocation = contentStorage.location(
+                contentStorage.documentRange.location,
+                offsetBy: location
+              ),
+              let fragment = textLayoutManager.textLayoutFragment(
+                for: textLocation
+              )
+        else {
+            return true
         }
+        let fragmentStart = contentStorage.offset(
+            from: contentStorage.documentRange.location,
+            to: fragment.rangeInElement.location
+        )
+        guard fragmentStart != NSNotFound else { return true }
+        let localLocation = location - fragmentStart
+        let visibleLines = fragment.textLineFragments.filter {
+            $0.characterRange.length > 0
+        }
+        guard let first = visibleLines.first,
+              let last = visibleLines.last else {
+            return true
+        }
+        return movingDown
+            ? localLocation >= last.characterRange.location
+            : localLocation <= NSMaxRange(first.characterRange)
+    }
+
+    private func caretLocation(
+        from location: Int,
+        skipping run: NSRange,
+        movingDown: Bool
+    ) -> Int? {
+        guard let textStorage else { return nil }
+        let source = textStorage.string
+        let text = source as NSString
+        let currentLine = text.lineRange(
+            for: NSRange(location: min(location, text.length), length: 0)
+        )
+        let targetAnchor: Int
+        if movingDown {
+            targetAnchor = NSMaxRange(run)
+            guard targetAnchor < text.length else { return nil }
+        } else {
+            guard run.location > 0 else { return nil }
+            targetAnchor = run.location - 1
+        }
+        let targetLine = text.lineRange(
+            for: NSRange(location: targetAnchor, length: 0)
+        )
+        let currentContentStart = visibleContentStart(
+            in: currentLine,
+            source: source
+        )
+        let targetContentStart = visibleContentStart(
+            in: targetLine,
+            source: source
+        )
+        let targetContentEnd = visibleContentEnd(
+            in: targetLine,
+            source: source
+        )
+        let visibleColumn = max(0, location - currentContentStart)
+        return min(targetContentStart + visibleColumn, targetContentEnd)
+    }
+
+    private func visibleContentStart(
+        in lineRange: NSRange,
+        source: String
+    ) -> Int {
+        NSMaxRange(
+            MarkdownStyler.listProtectedRange(
+                at: lineRange.location,
+                in: source
+            ) ?? NSRange(location: lineRange.location, length: 0)
+        )
+    }
+
+    private func visibleContentEnd(
+        in lineRange: NSRange,
+        source: String
+    ) -> Int {
+        let text = source as NSString
+        var end = NSMaxRange(lineRange)
+        while end > lineRange.location {
+            let character = text.character(at: end - 1)
+            guard character == 0x0A || character == 0x0D else { break }
+            end -= 1
+        }
+        let line = text.substring(with: lineRange)
+        if let idRange =
+            MarkdownBlockReferenceSyntax.protectedIDRanges(in: line).first {
+            end = min(end, lineRange.location + idRange.location)
+        }
+        return max(visibleContentStart(in: lineRange, source: source), end)
+    }
+
+    private func moveCaretDirectly(to location: Int) {
+        let range = NSRange(location: location, length: 0)
+        setSelectedRange(range)
+        scrollRangeToVisible(range)
     }
 
     override func updateInsertionPointStateAndRestartTimer(_ restartFlag: Bool) {

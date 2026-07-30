@@ -497,7 +497,16 @@ struct EditingBehaviorMatrixTests {
             NSRange(location: NSMaxRange(personal), length: 0)
         )
         stack.textView.moveDown(nil)
-        #expect(stack.textView.selectedRange().location >= work.location)
+        #expect(
+            stack.textView.selectedRange()
+                == NSRange(location: NSMaxRange(work), length: 0)
+        )
+        let stillCompacted = storage.attribute(
+            .paragraphStyle,
+            at: blank,
+            effectiveRange: nil
+        ) as? NSParagraphStyle
+        #expect(stillCompacted?.maximumLineHeight == 1)
         #expect(stack.textView.string == text)
 
         stack.textView.setSelectedRange(
@@ -506,7 +515,11 @@ struct EditingBehaviorMatrixTests {
         stack.textView.moveDown(nil)
         let firstWorkItem = nsText.range(of: "First work item")
         #expect(
-            stack.textView.selectedRange().location >= firstWorkItem.location
+            stack.textView.selectedRange()
+                == NSRange(
+                    location: firstWorkItem.location + work.length,
+                    length: 0
+                )
         )
         #expect(stack.textView.string == text)
     }
