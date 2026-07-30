@@ -233,7 +233,9 @@ enum DocumentAST {
             if i < end { i += 1 }                       // the `.` or `)`
         }
         let marker = NSRange(location: markerStart, length: i - markerStart)
-        if i < end, ns.character(at: i) == space || ns.character(at: i) == tab { i += 1 }
+        while i < end, ns.character(at: i) == space || ns.character(at: i) == tab {
+            i += 1
+        }
         var checkbox: NSRange?
         var checked = false
         if i + 2 < end, ns.character(at: i) == 0x5B, ns.character(at: i + 2) == 0x5D {   // [ x ]
@@ -242,7 +244,9 @@ enum DocumentAST {
                 checkbox = NSRange(location: i, length: 3)
                 checked = (mid == 0x78 || mid == 0x58)
                 i += 3
-                if i < end, ns.character(at: i) == space || ns.character(at: i) == tab { i += 1 }
+                while i < end, ns.character(at: i) == space || ns.character(at: i) == tab {
+                    i += 1
+                }
             }
         }
         var contentEnd = end

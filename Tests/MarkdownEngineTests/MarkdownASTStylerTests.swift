@@ -289,6 +289,48 @@ struct MarkdownASTStylerTests {
         #expect(underline(at: ns.range(of: "https://swift.org").location) == expected)
     }
 
+    @Test("long inactive link destinations collapse without tiny-font residue")
+    func longLinkDestinationsCollapseHorizontally() throws {
+        let longURL = "https://example.com/" + String(repeating: "signed-token-", count: 120)
+        let text = "before [link](\(longURL)) after"
+        let ns = text as NSString
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            caretLocation: 0
+        )
+        let destinationLocation = ns.range(of: longURL).location
+        let destinationFont = try #require(font(in: attrs, at: destinationLocation))
+
+        #expect(destinationFont.pointSize == base)
+        #expect(color(in: attrs, at: destinationLocation) == .clear)
+        #expect(
+            (longURL as NSString).size(withAttributes: [.font: destinationFont]).width < 1
+        )
+    }
+
+    @Test("extra list separator whitespace is layout-neutral without a tiny font")
+    func extraListSeparatorWhitespaceCollapsesHorizontally() throws {
+        let text = "- [one](https://example.com/one)\n-  [two](https://example.com/two)"
+        let ns = text as NSString
+        let attrs = MarkdownASTStyler.styleAttributes(
+            text: text,
+            fontName: fontName,
+            fontSize: base,
+            caretLocation: 0
+        )
+        let secondMarker = ns.range(of: "-  [two").location
+        let extraSpace = secondMarker + 2
+        let separatorFont = try #require(font(in: attrs, at: extraSpace))
+
+        #expect(separatorFont.pointSize == base)
+        #expect(color(in: attrs, at: extraSpace) == .clear)
+        #expect(
+            (" " as NSString).size(withAttributes: [.font: separatorFont]).width < 0.01
+        )
+    }
+
     /// Effective color at `pos`: the last styled range covering it that sets `.foregroundColor`.
     private func color(in attrs: [StyledRange], at pos: Int) -> NSColor? {
         var result: NSColor?

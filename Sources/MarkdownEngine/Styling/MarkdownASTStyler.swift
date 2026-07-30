@@ -76,6 +76,7 @@ enum MarkdownASTStyler {
             codeBackground: configuration.services.syntaxHighlighter.backgroundColor(),
             codeParagraphStyle: codePara,
             inlineMarkerFont: NSFont(name: fontName, size: hiddenSize) ?? .systemFont(ofSize: hiddenSize),
+            collapsedInlineFont: horizontallyCollapsedFont(baseFont),
             caret: caretLocation,
             selection: selection,
             config: configuration,
@@ -238,14 +239,15 @@ enum MarkdownASTStyler {
         // Hidden task item shares the bullet geometry: `[ ] ` collapses to ~zero
         // advance below, so the hanging indent measures only `- ` and task
         // content aligns with bullet content (the box replaces the bullet slot).
-        let markerGroup: NSRange
-        if let box = item.checkbox {
-            markerGroup = NSRange(location: item.marker.location,
-                                  length: box.location - item.marker.location)
-        } else {
-            markerGroup = NSRange(location: item.marker.location,
-                                  length: item.contentRange.location - item.marker.location)
-        }
+        let separatorEnd = item.checkbox?.location ?? item.contentRange.location
+        let normalizedSeparatorEnd = min(
+            separatorEnd,
+            NSMaxRange(item.marker) + 1
+        )
+        let markerGroup = NSRange(
+            location: item.marker.location,
+            length: normalizedSeparatorEnd - item.marker.location
+        )
         let markerWidth = (ctx.ns.substring(with: markerGroup) as NSString)
             .size(withAttributes: [.font: ctx.baseFont]).width
         let markerContentGap = !item.ordered
@@ -289,6 +291,20 @@ enum MarkdownASTStyler {
                 length: item.contentRange.location - item.range.location
             )
             attrs.append((prefixRange, [.listMarkerPrefix: true]))
+        }
+        let separatorRange = NSRange(
+            location: NSMaxRange(item.marker),
+            length: separatorEnd - NSMaxRange(item.marker)
+        )
+        if separatorRange.length > 1 {
+            let extraSeparator = NSRange(
+                location: separatorRange.location + 1,
+                length: separatorRange.length - 1
+            )
+            attrs.append((extraSeparator, [
+                .font: ctx.collapsedInlineFont,
+                .foregroundColor: NSColor.clear,
+            ]))
         }
         if let box = item.checkbox {
             let spacer = NSRange(location: NSMaxRange(item.marker), length: box.location - NSMaxRange(item.marker))
@@ -449,6 +465,7 @@ enum MarkdownASTStyler {
         let codeBackground: NSColor
         let codeParagraphStyle: NSParagraphStyle
         let inlineMarkerFont: NSFont
+        let collapsedInlineFont: NSFont
         let caret: Int
         /// The full selected range (nil/empty when the selection is a bare
         /// caret). Token-based elements already reveal on selection via
@@ -871,7 +888,10 @@ enum MarkdownASTStyler {
                     if markers.count >= 4 {   // also hide the "(url)" run
                         let hide = NSRange(location: markers[2].location,
                                            length: NSMaxRange(markers[3]) - markers[2].location)
-                        attrs.append((hide, [.font: ctx.inlineMarkerFont, .foregroundColor: NSColor.clear]))
+                        attrs.append((hide, [
+                            .font: ctx.collapsedInlineFont,
+                            .foregroundColor: NSColor.clear,
+                        ]))
                     }
                 }
                 shrinkInlineMarkers(children, ctx: ctx, forceReveal: active, into: &attrs)
@@ -891,6 +911,17 @@ enum MarkdownASTStyler {
         for marker in markers {
             attrs.append((marker, [.font: ctx.inlineMarkerFont, .kern: -ctx.inlineMarkerFont.pointSize]))
         }
+    }
+
+    /// Preserve normal vertical metrics and source-to-display positions while
+    /// making a hidden run contribute effectively no horizontal advance.
+    /// A non-zero scale keeps Core Text away from a singular font matrix.
+    private static func horizontallyCollapsedFont(_ font: NSFont) -> NSFont {
+        let transform = AffineTransform(scaleByX: 0.00001, byY: 1)
+        let descriptor = font.fontDescriptor.addingAttributes([
+            .matrix: NSAffineTransform(transform: transform),
+        ])
+        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 
     // MARK: - Helpers
