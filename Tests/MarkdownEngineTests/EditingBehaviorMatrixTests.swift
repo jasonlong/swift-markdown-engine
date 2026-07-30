@@ -272,6 +272,23 @@ struct EditingBehaviorMatrixTests {
         #expect(stack.textView.string == "a\nb")
     }
 
+    @Test("Backspace on the leading blank row removes that row")
+    func backspaceOnLeadingBlankLine() {
+        let stack = makeEditor(text: "\n- Personal")
+        stack.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        pressBackspace(stack)
+        #expect(stack.textView.string == "- Personal")
+        #expect(stack.textView.selectedRange() == NSRange(location: 2, length: 0))
+    }
+
+    @Test("Backspace removes whitespace from a leading blank row too")
+    func backspaceOnWhitespaceOnlyLeadingBlankLine() {
+        let stack = makeEditor(text: "\t  \n- Personal")
+        stack.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        pressBackspace(stack)
+        #expect(stack.textView.string == "- Personal")
+    }
+
     @Test("Deleting a selection ending inside a list prefix removes the whole prefix")
     func deleteSelectionEndingInsidePrefix() {
         let stack = makeEditor(text: "first\n- second")

@@ -909,6 +909,10 @@ extension NativeTextViewCoordinator {
             }
         }
         if commandSelector == #selector(NSResponder.deleteBackward(_:)),
+           handleBackspaceOnLeadingBlankLine(textView) {
+            return true
+        }
+        if commandSelector == #selector(NSResponder.deleteBackward(_:)),
            handleBackspaceAtProtectedListStart(textView) {
             return true
         }

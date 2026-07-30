@@ -1,6 +1,30 @@
 import AppKit
 
 extension NativeTextViewCoordinator {
+    /// At the document's absolute start there is no preceding character for
+    /// AppKit's normal Backspace command to remove. A leading blank Markdown
+    /// row is still an accidental row, though, so let Backspace remove its
+    /// line ending and pull the first meaningful block into place.
+    func handleBackspaceOnLeadingBlankLine(_ textView: NSTextView) -> Bool {
+        let selection = textView.selectedRange()
+        let nsText = textView.string as NSString
+        guard selection == NSRange(location: 0, length: 0), nsText.length > 0 else {
+            return false
+        }
+
+        let lineRange = nsText.lineRange(for: NSRange(location: 0, length: 0))
+        let line = nsText.substring(with: lineRange)
+        guard line.contains("\n"),
+              line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return false
+        }
+
+        MarkdownLists.performEdit(textView, replace: lineRange, with: "")
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        return true
+    }
+
     /// Backspace from the first visible character of a rendered list item should
     /// behave like ordinary line-start Backspace: remove the presentation-only
     /// prefix and join the content to the previous line. On the document's first
