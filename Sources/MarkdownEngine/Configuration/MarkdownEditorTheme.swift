@@ -80,7 +80,7 @@ public struct MarkdownEditorTheme: Sendable {
     // MARK: Strikethrough / decoration
 
     /// Stroke color used for strikethrough decorations
-    /// (e.g. completed task list items, horizontal rules).
+    /// (for example, completed task list items).
     public var strikethroughColor: NSColor
 
     // MARK: Highlight
