@@ -28,6 +28,23 @@ extension NativeTextView {
 
         let source = string
         let sourceNSString = source as NSString
+        let tokens = MarkdownBlockReferenceSyntax.tokens(in: source)
+            .filter { $0.kind == .transclusion }
+        let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
+        if blockReferenceSurfacesAreCurrent(
+            for: tokens,
+            in: sourceNSString,
+            availableWidth: availableWidth,
+            presentationProvider: presentationProvider,
+            storage: storage,
+            host: host
+        ) {
+            // This is the hot path while editing a later line: none of the
+            // token's geometry or presentation changed, so touching text
+            // storage would invalidate the host's drawing unnecessarily.
+            updateBlockReferenceSurfaceSelectionStates()
+            return
+        }
         // Restyling runs after every nearby edit. Keep compatible host views
         // mounted so a keystroke below a copied node does not visibly unmount
         // and remount the row. Attributes still need reconciliation because
@@ -42,7 +59,6 @@ extension NativeTextView {
             )
         }
 
-        let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
         var pending: [(
             token: MarkdownBlockReferenceToken,
             presentation: MarkdownBlockReferencePresentation,
@@ -53,7 +69,7 @@ extension NativeTextView {
             reused: Bool
         )] = []
         storage.beginEditing()
-        for token in MarkdownBlockReferenceSyntax.tokens(in: source) where token.kind == .transclusion {
+        for token in tokens {
             let visualIndent = blockReferenceVisualIndent(
                 for: token,
                 in: sourceNSString
@@ -228,6 +244,64 @@ extension NativeTextView {
         // provide a token rect. Keep the public bookkeeping truthful.
         blockReferenceSurfaceViews = retainedViews
         updateBlockReferenceSurfaceSelectionStates()
+    }
+
+    private func blockReferenceSurfacesAreCurrent(
+        for tokens: [MarkdownBlockReferenceToken],
+        in source: NSString,
+        availableWidth: CGFloat,
+        presentationProvider: (MarkdownBlockReferenceToken) -> MarkdownBlockReferencePresentation?,
+        storage: NSTextStorage,
+        host: NSView
+    ) -> Bool {
+        guard tokens.count == mountedBlockReferenceSurfaces.count,
+              tokens.count == blockReferenceSurfaceViews.count
+        else { return false }
+
+        for (token, mounted) in zip(tokens, mountedBlockReferenceSurfaces) {
+            let visualIndent = blockReferenceVisualIndent(for: token, in: source)
+            let surfaceWidth = max(1, availableWidth - visualIndent)
+            guard mounted.token == token,
+                  mounted.presentation == presentationProvider(token),
+                  abs(mounted.availableWidth - surfaceWidth) < 0.5,
+                  mounted.fontName == baseFont.fontName,
+                  abs(mounted.fontSize - baseFont.pointSize) < 0.5,
+                  blockReferenceSurfaceAttributesAreCurrent(
+                    for: token,
+                    in: storage
+                  ),
+                  mounted.view.superview === host
+            else { return false }
+        }
+        return true
+    }
+
+    private func blockReferenceSurfaceAttributesAreCurrent(
+        for token: MarkdownBlockReferenceToken,
+        in storage: NSTextStorage
+    ) -> Bool {
+        guard token.range.location != NSNotFound,
+              token.range.length > 0,
+              NSMaxRange(token.range) <= storage.length,
+              (storage.attribute(
+                .markdownBlockReferenceSurface,
+                at: token.range.location,
+                effectiveRange: nil
+              ) as? Bool) == true,
+              storage.attribute(.link, at: token.range.location, effectiveRange: nil) == nil,
+              (storage.attribute(
+                .foregroundColor,
+                at: token.range.location,
+                effectiveRange: nil
+              ) as? NSColor) == .clear,
+              let font = storage.attribute(
+                .font,
+                at: token.range.location,
+                effectiveRange: nil
+              ) as? NSFont,
+              abs(font.pointSize - 0.1) < 0.01
+        else { return false }
+        return true
     }
 
     private func removeUnusedBlockReferenceSurfaces(

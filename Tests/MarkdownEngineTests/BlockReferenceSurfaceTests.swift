@@ -39,6 +39,19 @@ struct BlockReferenceSurfaceTests {
         }
     }
 
+    private final class TextStorageEditRecorder: NSObject, NSTextStorageDelegate {
+        var editActions: [NSTextStorageEditActions] = []
+
+        func textStorage(
+            _ textStorage: NSTextStorage,
+            didProcessEditing editedMask: NSTextStorageEditActions,
+            range editedRange: NSRange,
+            changeInLength delta: Int
+        ) {
+            editActions.append(editedMask)
+        }
+    }
+
     @Test("an unchanged copied surface stays mounted while later text is edited")
     func copiedSurfaceIsRetainedForLaterEdits() throws {
         _ = NSApplication.shared
@@ -72,11 +85,14 @@ struct BlockReferenceSurfaceTests {
         let originalSurface = try #require(textView.blockReferenceSurfaceViews.first as? ProofSurface)
 
         textView.string = "\(reference)\nA normal line edited"
+        let editRecorder = TextStorageEditRecorder()
+        textView.textStorage?.delegate = editRecorder
         textView.updateBlockReferenceSurfaces()
 
         #expect(textView.blockReferenceSurfaceViews.first === originalSurface)
         #expect(originalSurface.superview === container)
         #expect(createdSurfaces == 1)
+        #expect(editRecorder.editActions.isEmpty)
     }
 
     @Test("a host surface is attached and visibly painted above its preserved token")
