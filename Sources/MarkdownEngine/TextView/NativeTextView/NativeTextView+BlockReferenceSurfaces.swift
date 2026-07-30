@@ -26,17 +26,31 @@ extension NativeTextView {
             return
         }
 
-        removeBlockReferenceSurfaces()
         let source = string
         let sourceNSString = source as NSString
+        // Restyling runs after every nearby edit. Keep compatible host views
+        // mounted so a keystroke below a copied node does not visibly unmount
+        // and remount the row. Attributes still need reconciliation because
+        // the styler may have refreshed them in the meantime.
+        let previousMounted = mountedBlockReferenceSurfaces
+        mountedBlockReferenceSurfaces.removeAll()
+        blockReferenceSurfaceViews.removeAll()
+        if storage.length > 0 {
+            restoreBlockReferenceAttributes(
+                in: storage,
+                fullRange: NSRange(location: 0, length: storage.length)
+            )
+        }
 
         let availableWidth = max(180, bounds.width - textContainerInset.width * 2)
         var pending: [(
             token: MarkdownBlockReferenceToken,
+            presentation: MarkdownBlockReferencePresentation,
             surface: MarkdownBlockReferenceSurface,
             visualIndent: CGFloat,
             availableWidth: CGFloat,
-            layoutHeight: CGFloat
+            layoutHeight: CGFloat,
+            reused: Bool
         )] = []
         storage.beginEditing()
         for token in MarkdownBlockReferenceSyntax.tokens(in: source) where token.kind == .transclusion {
@@ -46,9 +60,26 @@ extension NativeTextView {
             )
             let surfaceWidth = max(1, availableWidth - visualIndent)
             guard let presentation = presentationProvider(token),
-                  let surface = surfaceProvider(token, presentation, surfaceWidth),
-                  token.range.length > 0
-            else { continue }
+                  token.range.length > 0 else { continue }
+            let reusedSurface = previousMounted.first { mounted in
+                mounted.token == token
+                    && mounted.presentation == presentation
+                    && abs(mounted.availableWidth - surfaceWidth) < 0.5
+                    && mounted.fontName == baseFont.fontName
+                    && abs(mounted.fontSize - baseFont.pointSize) < 0.5
+            }
+            let surface: MarkdownBlockReferenceSurface
+            if let reusedSurface {
+                surface = MarkdownBlockReferenceSurface(
+                    view: reusedSurface.view,
+                    height: reusedSurface.height,
+                    markerCenterOffset: reusedSurface.markerCenterOffset
+                )
+            } else if let newSurface = surfaceProvider(token, presentation, surfaceWidth) {
+                surface = newSurface
+            } else {
+                continue
+            }
 
             let paragraphRange = sourceNSString.paragraphRange(for: token.range)
             let existingParagraph = (storage.attribute(.paragraphStyle, at: token.range.location, effectiveRange: nil)
@@ -111,15 +142,24 @@ extension NativeTextView {
             ], range: token.range)
             pending.append((
                 token,
+                presentation,
                 surface,
                 visualIndent,
                 surfaceWidth,
-                layoutHeight
+                layoutHeight,
+                reusedSurface != nil
             ))
         }
         storage.endEditing()
 
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else {
+            removeUnusedBlockReferenceSurfaces(
+                previousMounted,
+                retaining: []
+            )
+            updateBlockReferenceSurfaceSelectionStates()
+            return
+        }
         if let textLayoutManager {
             textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
         }
@@ -128,6 +168,7 @@ extension NativeTextView {
             (scrollView as? ClampedScrollView)?.clampToInsets()
         }
 
+        var retainedViews: [NSView] = []
         for entry in pending {
             let tokenRect = layoutBridge.boundingRect(forCharacterRange: entry.token.range, in: textContainer)
             guard !tokenRect.isEmpty else { continue }
@@ -158,17 +199,47 @@ extension NativeTextView {
                     )
                 }
             }
-            host.addSubview(entry.surface.view, positioned: .above, relativeTo: self)
-            entry.surface.view.needsDisplay = true
+            if entry.surface.view.superview !== host {
+                host.addSubview(entry.surface.view, positioned: .above, relativeTo: self)
+            }
+            if !entry.reused {
+                entry.surface.view.needsDisplay = true
+            }
             blockReferenceSurfaceViews.append(entry.surface.view)
+            retainedViews.append(entry.surface.view)
             mountedBlockReferenceSurfaces.append(
                 MountedBlockReferenceSurface(
                     token: entry.token,
-                    view: entry.surface.view
+                    presentation: entry.presentation,
+                    view: entry.surface.view,
+                    height: entry.surface.height,
+                    markerCenterOffset: entry.surface.markerCenterOffset,
+                    availableWidth: entry.availableWidth,
+                    fontName: baseFont.fontName,
+                    fontSize: baseFont.pointSize
                 )
             )
         }
+        removeUnusedBlockReferenceSurfaces(
+            previousMounted,
+            retaining: retainedViews
+        )
+        // A stale unmounted view can occur when TextKit cannot currently
+        // provide a token rect. Keep the public bookkeeping truthful.
+        blockReferenceSurfaceViews = retainedViews
         updateBlockReferenceSurfaceSelectionStates()
+    }
+
+    private func removeUnusedBlockReferenceSurfaces(
+        _ previousMounted: [MountedBlockReferenceSurface],
+        retaining retainedViews: [NSView]
+    ) {
+        let retained = Set(retainedViews.map(ObjectIdentifier.init))
+        for mounted in previousMounted where !retained.contains(ObjectIdentifier(mounted.view)) {
+            let interactive = mounted.view as? MarkdownBlockReferenceInteractiveView
+            interactive?.setBlockReferenceInteractionHandler(nil)
+            mounted.view.removeFromSuperview()
+        }
     }
 
     /// The source token has a near-zero rendering font, so TextKit cannot be

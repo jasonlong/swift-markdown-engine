@@ -39,6 +39,46 @@ struct BlockReferenceSurfaceTests {
         }
     }
 
+    @Test("an unchanged copied surface stays mounted while later text is edited")
+    func copiedSurfaceIsRetainedForLaterEdits() throws {
+        _ = NSApplication.shared
+        let reference = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 220))
+        let scrollView = NSScrollView(frame: root.bounds)
+        let container = NativeTextViewContainer(frame: root.bounds)
+        let textView = NativeTextView(frame: root.bounds)
+        root.addSubview(scrollView)
+        container.textView = textView
+        container.addSubview(textView)
+        scrollView.documentView = container
+        textView.string = "\(reference)\nA normal line"
+        let layoutBridge = LayoutBridge(try #require(textView.textLayoutManager))
+        textView.layoutBridge = layoutBridge
+        textView.blockReferencePresentationProvider = { _ in
+            MarkdownBlockReferencePresentation(
+                state: .resolved,
+                sourceLabel: "Weekly",
+                markdown: "- Ship the release"
+            )
+        }
+        var createdSurfaces = 0
+        textView.blockReferenceSurfaceProvider = { _, _, _ in
+            createdSurfaces += 1
+            return MarkdownBlockReferenceSurface(view: ProofSurface(), height: 28)
+        }
+
+        root.layoutSubtreeIfNeeded()
+        textView.updateBlockReferenceSurfaces()
+        let originalSurface = try #require(textView.blockReferenceSurfaceViews.first as? ProofSurface)
+
+        textView.string = "\(reference)\nA normal line edited"
+        textView.updateBlockReferenceSurfaces()
+
+        #expect(textView.blockReferenceSurfaceViews.first === originalSurface)
+        #expect(originalSurface.superview === container)
+        #expect(createdSurfaces == 1)
+    }
+
     @Test("a host surface is attached and visibly painted above its preserved token")
     func hostSurfaceIsVisibleWithoutReplacingTextStorage() throws {
         _ = NSApplication.shared

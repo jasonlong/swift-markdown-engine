@@ -94,7 +94,13 @@ final class NativeTextView: NSTextView {
     var blockReferenceSurfaceViews: [NSView] = []
     struct MountedBlockReferenceSurface {
         let token: MarkdownBlockReferenceToken
+        let presentation: MarkdownBlockReferencePresentation
         let view: NSView
+        let height: CGFloat
+        let markerCenterOffset: CGFloat?
+        let availableWidth: CGFloat
+        let fontName: String
+        let fontSize: CGFloat
     }
     var mountedBlockReferenceSurfaces: [MountedBlockReferenceSurface] = []
 
