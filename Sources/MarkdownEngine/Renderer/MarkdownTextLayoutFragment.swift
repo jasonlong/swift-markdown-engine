@@ -526,7 +526,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         let nsContext = NSGraphicsContext(cgContext: context, flipped: true)
         NSGraphicsContext.current = nsContext
 
-        let strokeColor = theme.mutedText.withAlphaComponent(0.18)
+        let strokeColor = theme.mutedText.withAlphaComponent(0.15)
         strokeColor.setFill()
 
         // Walk each line fragment in this layout fragment and paint a
