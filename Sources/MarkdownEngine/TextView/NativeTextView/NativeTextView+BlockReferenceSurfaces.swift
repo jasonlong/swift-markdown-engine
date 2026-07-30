@@ -78,13 +78,37 @@ extension NativeTextView {
                 height: entry.surface.height
             )
             entry.surface.view.frame = frame.integral
+            if let interactive =
+                entry.surface.view as? MarkdownBlockReferenceInteractiveView
+            {
+                interactive.setBlockReferenceInteractionHandler {
+                    [weak self] interaction in
+                    self?.handleBlockReferenceSurfaceInteraction(
+                        interaction,
+                        token: entry.token
+                    )
+                }
+            }
             host.addSubview(entry.surface.view, positioned: .above, relativeTo: self)
             entry.surface.view.needsDisplay = true
             blockReferenceSurfaceViews.append(entry.surface.view)
+            mountedBlockReferenceSurfaces.append(
+                MountedBlockReferenceSurface(
+                    token: entry.token,
+                    view: entry.surface.view
+                )
+            )
         }
+        updateBlockReferenceSurfaceSelectionStates()
     }
 
     func removeBlockReferenceSurfaces() {
+        for mounted in mountedBlockReferenceSurfaces {
+            (
+                mounted.view as? MarkdownBlockReferenceInteractiveView
+            )?.setBlockReferenceInteractionHandler(nil)
+        }
+        mountedBlockReferenceSurfaces.removeAll()
         for view in blockReferenceSurfaceViews { view.removeFromSuperview() }
         blockReferenceSurfaceViews.removeAll()
         guard let storage = textStorage, storage.length > 0 else { return }
@@ -122,5 +146,326 @@ extension NativeTextView {
             storage.addAttribute(.link, value: value, range: range)
             storage.removeAttribute(.markdownBlockReferenceOriginalLink, range: range)
         }
+    }
+
+    func updateBlockReferenceSurfaceSelectionStates() {
+        let selection = selectedRange()
+        for mounted in mountedBlockReferenceSurfaces {
+            guard let interactive =
+                    mounted.view as? MarkdownBlockReferenceInteractiveView
+            else { continue }
+            interactive.setBlockReferenceSelectionState(
+                blockReferenceSelectionState(
+                    for: mounted.token,
+                    selection: selection
+                )
+            )
+        }
+    }
+
+    func handleBlockReferenceSurfaceInteraction(
+        _ interaction: MarkdownBlockReferenceSurfaceInteraction,
+        token: MarkdownBlockReferenceToken
+    ) {
+        switch interaction {
+        case .select:
+            setSelectedRange(token.range)
+            updateBlockReferenceSurfaceSelectionStates()
+        case .placeCaretBefore:
+            window?.makeFirstResponder(self)
+            setSelectedRange(NSRange(location: token.range.location, length: 0))
+            updateBlockReferenceSurfaceSelectionStates()
+        case .placeCaretAfter:
+            window?.makeFirstResponder(self)
+            setSelectedRange(NSRange(location: NSMaxRange(token.range), length: 0))
+            updateBlockReferenceSurfaceSelectionStates()
+        case .indent:
+            window?.makeFirstResponder(self)
+            _ = adjustBlockReferenceIndentation(
+                for: token,
+                direction: .indent
+            )
+        case .outdent:
+            window?.makeFirstResponder(self)
+            _ = adjustBlockReferenceIndentation(
+                for: token,
+                direction: .outdent
+            )
+        }
+    }
+
+    enum BlockReferenceCommand {
+        case indent
+        case outdent
+        case deleteBackward
+        case deleteForward
+    }
+
+    func handleBlockReferenceCommand(
+        _ command: BlockReferenceCommand
+    ) -> Bool {
+        let selection = selectedRange()
+        guard let token = blockReferenceToken(for: selection) else {
+            return false
+        }
+        let state = blockReferenceSelectionState(
+            for: token,
+            selection: selection
+        )
+
+        switch command {
+        case .indent:
+            return adjustBlockReferenceIndentation(
+                for: token,
+                direction: .indent
+            )
+        case .outdent:
+            _ = adjustBlockReferenceIndentation(
+                for: token,
+                direction: .outdent
+            )
+            return true
+        case .deleteBackward:
+            switch state {
+            case .selected:
+                return performBlockReferenceDelete(for: token)
+            case .caretAfter:
+                setSelectedRange(token.range)
+                updateBlockReferenceSurfaceSelectionStates()
+                return true
+            case .caretBefore:
+                _ = adjustBlockReferenceIndentation(
+                    for: token,
+                    direction: .outdent
+                )
+                return true
+            case .none:
+                return false
+            }
+        case .deleteForward:
+            switch state {
+            case .selected:
+                return performBlockReferenceDelete(for: token)
+            case .caretBefore:
+                setSelectedRange(token.range)
+                updateBlockReferenceSurfaceSelectionStates()
+                return true
+            case .caretAfter:
+                return true
+            case .none:
+                return false
+            }
+        }
+    }
+
+    func redirectSelectionAroundBlockReference() -> Bool {
+        let selection = selectedRange()
+        let tokens = MarkdownBlockReferenceSyntax.tokens(in: string)
+            .filter { $0.kind == .transclusion }
+
+        if selection.length == 0,
+           let token = tokens.first(where: {
+               selection.location > $0.range.location
+                   && selection.location < NSMaxRange($0.range)
+           })
+        {
+            let event = NSApp.currentEvent
+            let modifiers = event?.modifierFlags.intersection(
+                .deviceIndependentFlagsMask
+            ) ?? []
+            let plainArrow = event?.type == .keyDown && modifiers.isEmpty
+            let previous = (
+                delegate as? NativeTextViewCoordinator
+            )?.previousSelectedRange
+            let target: NSRange
+            if plainArrow, event?.keyCode == 124,
+               previous == NSRange(
+                   location: token.range.location,
+                   length: 0
+               )
+            {
+                target = token.range
+            } else if plainArrow, event?.keyCode == 123,
+                      previous == NSRange(
+                          location: NSMaxRange(token.range),
+                          length: 0
+                      )
+            {
+                target = token.range
+            } else {
+                let distanceToStart =
+                    selection.location - token.range.location
+                let distanceToEnd =
+                    NSMaxRange(token.range) - selection.location
+                target = NSRange(
+                    location: distanceToStart <= distanceToEnd
+                        ? token.range.location
+                        : NSMaxRange(token.range),
+                    length: 0
+                )
+            }
+            setSelectedRange(target)
+            return true
+        }
+
+        if selection.length > 0,
+           let token = tokens.first(where: {
+               NSIntersectionRange(selection, $0.range).length > 0
+                   && (
+                       selection.location > $0.range.location
+                           || NSMaxRange(selection)
+                               < NSMaxRange($0.range)
+                   )
+           })
+        {
+            let start = min(selection.location, token.range.location)
+            let end = max(NSMaxRange(selection), NSMaxRange(token.range))
+            setSelectedRange(
+                NSRange(location: start, length: end - start)
+            )
+            return true
+        }
+        return false
+    }
+
+    private enum BlockReferenceIndentDirection {
+        case indent
+        case outdent
+    }
+
+    @discardableResult
+    private func adjustBlockReferenceIndentation(
+        for token: MarkdownBlockReferenceToken,
+        direction: BlockReferenceIndentDirection
+    ) -> Bool {
+        let source = string as NSString
+        let lineRange = source.lineRange(for: token.range)
+        let line = source.substring(with: lineRange) as NSString
+        let leading = line.range(
+            of: #"^[ \t]*"#,
+            options: .regularExpression
+        )
+        let leadingWhitespace = line.substring(with: leading)
+        let originalState = blockReferenceSelectionState(
+            for: token,
+            selection: selectedRange()
+        )
+        let matchingTokens = MarkdownBlockReferenceSyntax.tokens(
+            in: string
+        ).filter {
+            $0.kind == token.kind
+                && $0.noteTarget == token.noteTarget
+                && $0.blockID == token.blockID
+        }
+        guard let occurrence = matchingTokens.firstIndex(of: token) else {
+            return false
+        }
+
+        let editRange: NSRange
+        let replacement: String
+        switch direction {
+        case .indent:
+            let level = MarkdownLists.indentLevel(
+                from: leadingWhitespace
+            )
+            guard level < configuration.lists.maximumNestingLevel else {
+                return true
+            }
+            editRange = NSRange(location: lineRange.location, length: 0)
+            replacement = "\t"
+        case .outdent:
+            if leadingWhitespace.hasPrefix("\t") {
+                editRange = NSRange(location: lineRange.location, length: 1)
+            } else {
+                let spaces = leadingWhitespace.prefix(2).prefix {
+                    $0 == " "
+                }.count
+                guard spaces > 0 else { return false }
+                editRange = NSRange(
+                    location: lineRange.location,
+                    length: spaces
+                )
+            }
+            replacement = ""
+        }
+
+        MarkdownLists.performEdit(
+            self,
+            replace: editRange,
+            with: replacement
+        )
+        let refreshed = MarkdownBlockReferenceSyntax.tokens(in: string)
+            .filter {
+                $0.kind == token.kind
+                    && $0.noteTarget == token.noteTarget
+                    && $0.blockID == token.blockID
+            }
+        guard refreshed.indices.contains(occurrence) else { return true }
+        let updatedToken = refreshed[occurrence]
+        let updatedSelection: NSRange
+        switch originalState {
+        case .caretBefore:
+            updatedSelection = NSRange(
+                location: updatedToken.range.location,
+                length: 0
+            )
+        case .caretAfter:
+            updatedSelection = NSRange(
+                location: NSMaxRange(updatedToken.range),
+                length: 0
+            )
+        case .selected, .none:
+            updatedSelection = updatedToken.range
+        }
+        setSelectedRange(updatedSelection)
+        updateBlockReferenceSurfaces()
+        return true
+    }
+
+    private func blockReferenceToken(
+        for selection: NSRange
+    ) -> MarkdownBlockReferenceToken? {
+        MarkdownBlockReferenceSyntax.tokens(in: string)
+            .filter { $0.kind == .transclusion }
+            .first { token in
+                if selection.length == 0 {
+                    return selection.location == token.range.location
+                        || selection.location == NSMaxRange(token.range)
+                }
+                return NSIntersectionRange(
+                    selection,
+                    token.range
+                ).length > 0
+            }
+    }
+
+    private func blockReferenceSelectionState(
+        for token: MarkdownBlockReferenceToken,
+        selection: NSRange
+    ) -> MarkdownBlockReferenceSelectionState {
+        if selection.length == 0 {
+            if selection.location == token.range.location {
+                return .caretBefore
+            }
+            if selection.location == NSMaxRange(token.range) {
+                return .caretAfter
+            }
+            return .none
+        }
+        return NSIntersectionRange(selection, token.range).length > 0
+            ? .selected
+            : .none
+    }
+
+    private func performBlockReferenceDelete(
+        for token: MarkdownBlockReferenceToken
+    ) -> Bool {
+        guard let mounted = mountedBlockReferenceSurfaces.first(where: {
+            $0.token == token
+        }), let interactive =
+            mounted.view as? MarkdownBlockReferenceInteractiveView
+        else { return false }
+        interactive.performBlockReferenceDelete()
+        return true
     }
 }

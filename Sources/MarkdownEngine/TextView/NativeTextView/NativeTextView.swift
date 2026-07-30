@@ -92,6 +92,11 @@ final class NativeTextView: NSTextView {
     /// Native host views attached as siblings above the text view. They are
     /// intentionally not text attachments: the canonical token stays in storage.
     var blockReferenceSurfaceViews: [NSView] = []
+    struct MountedBlockReferenceSurface {
+        let token: MarkdownBlockReferenceToken
+        let view: NSView
+    }
+    var mountedBlockReferenceSurfaces: [MountedBlockReferenceSurface] = []
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()

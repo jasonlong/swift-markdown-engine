@@ -359,6 +359,11 @@ extension NativeTextViewCoordinator {
         if configuration.rawSourceMode { return }
         if isWritingToolsActive { return }
         if redirectSelectionFromCollapsedOutline(in: tv) { return }
+        if (tv as? NativeTextView)?
+            .redirectSelectionAroundBlockReference() == true
+        {
+            return
+        }
         if redirectSelectionFromProtectedBlockID(in: tv) { return }
         stabilizeTypingAttributesAtProtectedBlockIDBoundary(in: tv)
         if redirectSelectionFromProtectedListPrefix(in: tv) { return }
@@ -663,6 +668,8 @@ extension NativeTextViewCoordinator {
             return NSIntersectionRange(selection, token.range).length > 0
         }
         onBlockReferenceSelectionChange?(active)
+        (textView as? NativeTextView)?
+            .updateBlockReferenceSurfaceSelectionStates()
     }
 
     /// Whether the line-expanded window around `range` contains a registered
@@ -883,6 +890,24 @@ extension NativeTextViewCoordinator {
     public func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         // Raw mode: default key handling (no ⇧⇥ outdent, no preview routing).
         if configuration.rawSourceMode { return false }
+        if let nativeTextView = textView as? NativeTextView {
+            if commandSelector == #selector(NSResponder.insertTab(_:)),
+               nativeTextView.handleBlockReferenceCommand(.indent) {
+                return true
+            }
+            if commandSelector == #selector(NSResponder.insertBacktab(_:)),
+               nativeTextView.handleBlockReferenceCommand(.outdent) {
+                return true
+            }
+            if commandSelector == #selector(NSResponder.deleteBackward(_:)),
+               nativeTextView.handleBlockReferenceCommand(.deleteBackward) {
+                return true
+            }
+            if commandSelector == #selector(NSResponder.deleteForward(_:)),
+               nativeTextView.handleBlockReferenceCommand(.deleteForward) {
+                return true
+            }
+        }
         if commandSelector == #selector(NSResponder.deleteBackward(_:)),
            handleBackspaceAtProtectedListStart(textView) {
             return true
