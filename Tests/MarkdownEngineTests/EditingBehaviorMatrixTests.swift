@@ -459,4 +459,55 @@ struct EditingBehaviorMatrixTests {
         ) as? NSParagraphStyle
         #expect(recompacted?.maximumLineHeight == 1)
     }
+
+    @Test("Arrow keys skip a collapsed list separator without editing")
+    func arrowKeysSkipCollapsedListSeparator() throws {
+        let text = """
+        - Personal
+          - Last personal item
+
+        - Work
+
+          - First work item
+        """
+        let stack = makeEditor(text: text)
+        var configuration = stack.textView.configuration
+        configuration.lists.trailingBlankLineHeightScale = 0
+        stack.textView.configuration = configuration
+        stack.coordinator.configuration = configuration
+        stack.textView.frame = NSRect(x: 0, y: 0, width: 600, height: 240)
+        stack.coordinator.rebuildTextStorageAndStyle(stack.textView, from: text)
+        stack.textView.textLayoutManager?.ensureLayout(
+            for: stack.textView.textLayoutManager!.documentRange
+        )
+
+        let nsText = text as NSString
+        let personal = nsText.range(of: "Last personal item")
+        let work = nsText.range(of: "Work")
+        let blank = nsText.range(of: "\n\n").location + 1
+        let storage = try #require(stack.textView.textStorage)
+        let compacted = storage.attribute(
+            .paragraphStyle,
+            at: blank,
+            effectiveRange: nil
+        ) as? NSParagraphStyle
+        #expect(compacted?.maximumLineHeight == 1)
+
+        stack.textView.setSelectedRange(
+            NSRange(location: NSMaxRange(personal), length: 0)
+        )
+        stack.textView.moveDown(nil)
+        #expect(stack.textView.selectedRange().location >= work.location)
+        #expect(stack.textView.string == text)
+
+        stack.textView.setSelectedRange(
+            NSRange(location: NSMaxRange(work), length: 0)
+        )
+        stack.textView.moveDown(nil)
+        let firstWorkItem = nsText.range(of: "First work item")
+        #expect(
+            stack.textView.selectedRange().location >= firstWorkItem.location
+        )
+        #expect(stack.textView.string == text)
+    }
 }

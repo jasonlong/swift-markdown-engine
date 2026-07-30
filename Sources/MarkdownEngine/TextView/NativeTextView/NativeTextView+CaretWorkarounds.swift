@@ -10,6 +10,100 @@
 import AppKit
 
 extension NativeTextView {
+    /// Keyboard navigation treats visually collapsed Markdown separators as
+    /// layout spacing, not as a destination. Mouse placement still reaches
+    /// the real blank line so a user can intentionally reveal and edit it.
+    override func moveDown(_ sender: Any?) {
+        let selection = selectedRange()
+        let compactedRun = selection.length == 0
+            ? compactedBlankRun(after: selection.location)
+            : nil
+        super.moveDown(sender)
+        skipCompactedBlankRunIfNeeded(compactedRun, movingDown: true, sender: sender)
+    }
+
+    override func moveUp(_ sender: Any?) {
+        let selection = selectedRange()
+        let compactedRun = selection.length == 0
+            ? compactedBlankRun(before: selection.location)
+            : nil
+        super.moveUp(sender)
+        skipCompactedBlankRunIfNeeded(compactedRun, movingDown: false, sender: sender)
+    }
+
+    private func compactedBlankRun(after location: Int) -> NSRange? {
+        guard let textStorage else { return nil }
+        let text = textStorage.string as NSString
+        guard location >= 0, location <= text.length else { return nil }
+        let currentLine = text.lineRange(
+            for: NSRange(location: min(location, text.length), length: 0)
+        )
+        let candidate = NSMaxRange(currentLine)
+        guard candidate < text.length else { return nil }
+        return compactedBlankRun(at: candidate, in: textStorage)
+    }
+
+    private func compactedBlankRun(before location: Int) -> NSRange? {
+        guard let textStorage else { return nil }
+        let text = textStorage.string as NSString
+        guard location > 0, location <= text.length else { return nil }
+        let currentLine = text.lineRange(
+            for: NSRange(location: min(location, text.length), length: 0)
+        )
+        guard currentLine.location > 0 else { return nil }
+        return compactedBlankRun(
+            at: currentLine.location - 1,
+            in: textStorage
+        )
+    }
+
+    private func compactedBlankRun(
+        at location: Int,
+        in textStorage: NSTextStorage
+    ) -> NSRange? {
+        guard let run = MarkdownStyler.blankRunRange(
+            at: location,
+            in: textStorage.string
+        ), run.length > 0 else {
+            return nil
+        }
+        var hasCompactedLine = false
+        let compactedThreshold = max(1, baseFont.pointSize * 0.5)
+        textStorage.enumerateAttribute(
+            .paragraphStyle,
+            in: run,
+            options: []
+        ) { value, _, stop in
+            guard let style = value as? NSParagraphStyle,
+                  style.maximumLineHeight > 0,
+                  style.maximumLineHeight < compactedThreshold else {
+                return
+            }
+            hasCompactedLine = true
+            stop.pointee = true
+        }
+        return hasCompactedLine ? run : nil
+    }
+
+    private func skipCompactedBlankRunIfNeeded(
+        _ run: NSRange?,
+        movingDown: Bool,
+        sender: Any?
+    ) {
+        guard let run else { return }
+        var attempts = max(1, run.length + 1)
+        while attempts > 0,
+              selectedRange().length == 0,
+              NSLocationInRange(selectedRange().location, run) {
+            if movingDown {
+                super.moveDown(sender)
+            } else {
+                super.moveUp(sender)
+            }
+            attempts -= 1
+        }
+    }
+
     override func updateInsertionPointStateAndRestartTimer(_ restartFlag: Bool) {
         super.updateInsertionPointStateAndRestartTimer(restartFlag)
         applyBlockImageCaretPolicy()
