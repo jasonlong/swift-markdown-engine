@@ -463,6 +463,59 @@ struct BlockReferenceSurfaceTests {
         #expect(abs(nestedSurface.frame.width - rootSurface.frame.width + 64) < 1)
     }
 
+    @Test("copied surface markers use the native list marker columns")
+    func copiedSurfaceMarkersAlignWithNativeListColumns() throws {
+        _ = NSApplication.shared
+        let id = "01hzy7vz8g4qj6m2n3r5t7w9xy"
+        let reference = "![[Weekly#^\(id)]]"
+        let source = "\(reference)\n\t\(reference)"
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 180))
+        let container = NativeTextViewContainer(frame: root.bounds)
+        let textView = NativeTextView(frame: root.bounds)
+        root.addSubview(container)
+        container.textView = textView
+        container.addSubview(textView)
+        textView.configuration.lists.firstLevelIndent = 28
+        textView.configuration.lists.indentPerLevel = 32
+        textView.string = source
+        let bridge = LayoutBridge(
+            try #require(textView.textLayoutManager)
+        )
+        textView.layoutBridge = bridge
+        textView.blockReferencePresentationProvider = { _ in
+            MarkdownBlockReferencePresentation(
+                state: .resolved,
+                sourceLabel: "Weekly",
+                markdown: "- Source item"
+            )
+        }
+        var surfaces: [ProofSurface] = []
+        let markerCenterOffset: CGFloat = 15
+        textView.blockReferenceSurfaceProvider = { _, _, _ in
+            let surface = ProofSurface()
+            surfaces.append(surface)
+            return MarkdownBlockReferenceSurface(
+                view: surface,
+                height: 24,
+                markerCenterOffset: markerCenterOffset
+            )
+        }
+
+        root.layoutSubtreeIfNeeded()
+        textView.updateBlockReferenceSurfaces()
+
+        let markerWidth = ("-" as NSString).size(
+            withAttributes: [.font: textView.baseFont]
+        ).width
+        let rootMarkerX = textView.frame.minX + textView.textContainerOrigin.x
+            + 28 + markerWidth / 2
+        let nestedMarkerX = rootMarkerX + 32
+        let rootSurface = try #require(surfaces.first)
+        let nestedSurface = try #require(surfaces.last)
+        #expect(abs(rootSurface.frame.minX + markerCenterOffset - rootMarkerX) < 1)
+        #expect(abs(nestedSurface.frame.minX + markerCenterOffset - nestedMarkerX) < 1)
+    }
+
     @Test("native caret is suppressed at copied-node boundaries")
     func nativeCaretIsSuppressedAtCopiedNodeBoundaries() throws {
         let source = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]\nAfter"

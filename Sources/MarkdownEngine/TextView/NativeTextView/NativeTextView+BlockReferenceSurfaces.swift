@@ -103,9 +103,17 @@ extension NativeTextView {
         for entry in pending {
             let tokenRect = layoutBridge.boundingRect(forCharacterRange: entry.token.range, in: textContainer)
             guard !tokenRect.isEmpty else { continue }
+            let surfaceX: CGFloat
+            if let markerCenterOffset = entry.surface.markerCenterOffset {
+                surfaceX = frame.minX + blockReferenceMarkerCenterX(
+                    for: entry.visualIndent
+                ) - markerCenterOffset
+            } else {
+                surfaceX = frame.minX + textContainerOrigin.x
+                    + entry.visualIndent
+            }
             let frame = NSRect(
-                x: frame.minX + textContainerOrigin.x
-                    + entry.visualIndent,
+                x: surfaceX,
                 y: frame.minY + textContainerOrigin.y + tokenRect.minY,
                 width: entry.availableWidth,
                 height: entry.surface.height
@@ -148,6 +156,20 @@ extension NativeTextView {
         let leading = String(line.prefix { $0 == " " || $0 == "\t" })
         return CGFloat(MarkdownLists.indentLevel(from: leading))
             * configuration.lists.indentPerLevel
+    }
+
+    /// Native list bullets are centered within the advance of the source `-`
+    /// marker. A hosted copied node has a wider marker plus a caret gutter, so
+    /// align its declared marker center to this same column explicitly.
+    private func blockReferenceMarkerCenterX(for visualIndent: CGFloat) -> CGFloat {
+        let font = baseFont
+        let markerWidth = ("-" as NSString).size(
+            withAttributes: [.font: font]
+        ).width
+        return textContainerOrigin.x
+            + configuration.lists.firstLevelIndent
+            + visualIndent
+            + markerWidth / 2
     }
 
     func removeBlockReferenceSurfaces() {

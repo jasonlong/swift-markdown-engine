@@ -46,9 +46,19 @@ public protocol MarkdownBlockReferenceInteractiveView: AnyObject {
 public struct MarkdownBlockReferenceSurface {
     public let view: NSView
     public let height: CGFloat
+    /// Optional horizontal distance from the surface's leading edge to the
+    /// center of its list marker. When supplied, MarkdownEngine places that
+    /// marker on the native list marker column rather than aligning the view's
+    /// outer edge to the source text column.
+    public let markerCenterOffset: CGFloat?
 
-    public init(view: NSView, height: CGFloat) {
+    public init(
+        view: NSView,
+        height: CGFloat,
+        markerCenterOffset: CGFloat? = nil
+    ) {
         self.view = view
         self.height = max(1, height)
+        self.markerCenterOffset = markerCenterOffset
     }
 }
