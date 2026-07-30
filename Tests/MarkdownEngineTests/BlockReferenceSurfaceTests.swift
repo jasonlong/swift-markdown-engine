@@ -239,6 +239,13 @@ struct BlockReferenceSurfaceTests {
         let root = NSView(
             frame: NSRect(x: 0, y: 0, width: 480, height: 180)
         )
+        let window = NSWindow(
+            contentRect: root.frame,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = root
         let scrollView = NSScrollView(frame: root.bounds)
         let container = NativeTextViewContainer(frame: root.bounds)
         let textView = NativeTextView(frame: root.bounds)
@@ -287,6 +294,7 @@ struct BlockReferenceSurfaceTests {
         interact(.select)
         #expect(textView.selectedRange() == token.range)
         #expect(surface.selectionStates.last == .selected)
+        #expect(window.firstResponder === textView)
 
         interact(.placeCaretAfter)
         #expect(

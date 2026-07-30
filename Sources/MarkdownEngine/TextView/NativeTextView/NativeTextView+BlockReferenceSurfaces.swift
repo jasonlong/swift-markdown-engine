@@ -254,6 +254,7 @@ extension NativeTextView {
     ) {
         switch interaction {
         case .select:
+            window?.makeFirstResponder(self)
             setSelectedRange(token.range)
             updateBlockReferenceSurfaceSelectionStates()
         case .placeCaretBefore:
