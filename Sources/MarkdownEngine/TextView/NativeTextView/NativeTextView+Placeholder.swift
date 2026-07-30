@@ -71,19 +71,19 @@ extension NativeTextView {
         let marker = String(prefix.prefix(1))
         let markerWidth = (marker as NSString).size(withAttributes: [.font: font]).width
         let prefixWidth = (prefix as NSString).size(withAttributes: [.font: font]).width
-        let baselineY = BulletMarkerGeometry.listBaselineY(for: font)
+        let baselineY = MarkdownListMarkerGeometry.listBaselineY(for: font)
         let textPadding = textContainer?.lineFragmentPadding ?? 0
         let markerX = textPadding + configuration.lists.firstLevelIndent
 
         return VirtualListPlaceholderMetrics(
             bulletCenter: CGPoint(
                 x: markerX + markerWidth / 2,
-                y: BulletMarkerGeometry.centerY(
+                y: MarkdownListMarkerGeometry.centerY(
                     forBaseline: baselineY,
                     font: font
                 )
             ),
-            dotDiameter: BulletMarkerGeometry.dotDiameter(for: font),
+            dotDiameter: MarkdownListMarkerGeometry.dotDiameter(for: font),
             contentX: markerX + prefixWidth + configuration.lists.markerContentGap
         )
     }

@@ -91,7 +91,7 @@ struct BasicEditingRegressionTests {
         let baselineY: CGFloat = 100
 
         #expect(
-            BulletMarkerGeometry.centerY(
+            MarkdownListMarkerGeometry.centerY(
                 forBaseline: baselineY,
                 font: font
             ) == baselineY - font.capHeight / 2
@@ -280,11 +280,11 @@ struct BasicEditingRegressionTests {
             + ("- " as NSString).size(withAttributes: [.font: font]).width
             + stack.textView.configuration.lists.markerContentGap
         #expect(metrics.contentX == expectedContentX)
-        #expect(metrics.dotDiameter == BulletMarkerGeometry.dotDiameter(for: font))
-        let expectedBaseline = BulletMarkerGeometry.listBaselineY(for: font)
+        #expect(metrics.dotDiameter == MarkdownListMarkerGeometry.dotDiameter(for: font))
+        let expectedBaseline = MarkdownListMarkerGeometry.listBaselineY(for: font)
         #expect(
             metrics.bulletCenter.y
-                == BulletMarkerGeometry.centerY(
+                == MarkdownListMarkerGeometry.centerY(
                     forBaseline: expectedBaseline,
                     font: font
                 )
@@ -329,7 +329,7 @@ struct BasicEditingRegressionTests {
                     + lineBounds.minX
                     + markerPosition.x
                     + markerWidth / 2,
-                y: BulletMarkerGeometry.centerY(
+                y: MarkdownListMarkerGeometry.centerY(
                     forBaseline: baselineY,
                     font: font
                 )

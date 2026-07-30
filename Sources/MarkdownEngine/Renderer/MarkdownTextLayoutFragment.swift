@@ -632,15 +632,15 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 as? NSParagraphStyle
             // A guide shares the parent's marker column, but should begin
             // below that marker rather than visibly bisecting the bullet.
-            let bulletCenterY = BulletMarkerGeometry.centerY(
+            let bulletCenterY = MarkdownListMarkerGeometry.centerY(
                 forBaseline: position.baselineY,
                 font: font
             )
-            let top = bulletCenterY + BulletMarkerGeometry.dotDiameter(for: font) / 2 + 2
+            let top = bulletCenterY + MarkdownListMarkerGeometry.dotDiameter(for: font) / 2 + 2
             let markerWidth = ((textStorage.string as NSString).substring(with: attrRange) as NSString)
                 .size(withAttributes: [.font: font]).width
             let x = position.x + markerWidth / 2
-            let markerDiameter = BulletMarkerGeometry.dotDiameter(for: font)
+            let markerDiameter = MarkdownListMarkerGeometry.dotDiameter(for: font)
             let siblingMarker = textStorage.attribute(
                 .outlineGuideNextSibling,
                 at: attrRange.location,
@@ -681,7 +681,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             ) as? Int
             let candidate = siblingMarker.flatMap {
                 self.bulletCenterYInContainerCoordinates(forDocumentCharacterAt: $0)
-            }.map { $0 - BulletMarkerGeometry.dotDiameter(for: font) / 2 - 2 }
+            }.map { $0 - MarkdownListMarkerGeometry.dotDiameter(for: font) / 2 - 2 }
                 ?? self.renderedBottomInContainerCoordinates(
                     forDocumentCharacterAt: max(0, end - 1)
                 )
@@ -754,7 +754,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let baselineY = fragment.layoutFragmentFrame.origin.y
                 + line.typographicBounds.origin.y
                 + character.y
-            return BulletMarkerGeometry.centerY(forBaseline: baselineY, font: font)
+            return MarkdownListMarkerGeometry.centerY(forBaseline: baselineY, font: font)
         }
         return nil
     }
@@ -793,12 +793,12 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
             let center = CGPoint(
                 x: pos.x + markerWidth / 2,
-                y: BulletMarkerGeometry.centerY(
+                y: MarkdownListMarkerGeometry.centerY(
                     forBaseline: pos.baselineY,
                     font: font
                 )
             )
-            let dotDiameter = BulletMarkerGeometry.dotDiameter(for: font)
+            let dotDiameter = MarkdownListMarkerGeometry.dotDiameter(for: font)
             let isCollapsed = (ts.attribute(
                 .outlineCollapsed,
                 at: attrRange.location,

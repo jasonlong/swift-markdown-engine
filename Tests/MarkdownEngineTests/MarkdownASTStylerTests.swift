@@ -499,7 +499,7 @@ struct TaskCheckboxGeometryStylerTests {
             size: size
         )
         let checkboxCenterY = boxY + size / 2
-        let bulletCenterY = BulletMarkerGeometry.centerY(
+        let bulletCenterY = MarkdownListMarkerGeometry.centerY(
             forBaseline: baselineY,
             font: baseFont
         )

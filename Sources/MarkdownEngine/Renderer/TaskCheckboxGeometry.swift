@@ -35,7 +35,7 @@ enum TaskCheckboxGeometry {
     /// by bullet markers. Using the font's full ascender/descender bounds here
     /// makes task controls drift relative to bullets for fonts such as SF Pro.
     static func boxY(baselineY: CGFloat, font: NSFont, size: CGFloat) -> CGFloat {
-        BulletMarkerGeometry.centerY(
+        MarkdownListMarkerGeometry.centerY(
             forBaseline: baselineY,
             font: font
         ) - size / 2
