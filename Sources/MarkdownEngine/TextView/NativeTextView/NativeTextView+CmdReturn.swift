@@ -10,10 +10,32 @@ import AppKit
 
 extension NativeTextView {
     override func keyDown(with event: NSEvent) {
+        if handleBlockReferenceTab(event) { return }
         if handleWikiLinkOpeningBracket(event) { return }
         if handleOptionArrow(event) { return }
         if handleCommandReturn(event) { return }
         super.keyDown(with: event)
+    }
+
+    /// AppKit can treat a physical Tab at an insertion point as focus traversal
+    /// before it calls the text delegate's `doCommandBy(insertTab:)`. A copied
+    /// node deliberately exposes caret positions just before and after its
+    /// atomic surface, so handle an unmodified Tab here as well. This keeps the
+    /// shortcut in the editor instead of letting focus leave the note.
+    private func handleBlockReferenceTab(_ event: NSEvent) -> Bool {
+        guard !configuration.rawSourceMode, event.keyCode == 48 else {
+            return false
+        }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let ignored: NSEvent.ModifierFlags = [.capsLock, .numericPad, .function]
+        switch modifiers.subtracting(ignored) {
+        case []:
+            return handleBlockReferenceCommand(.indent)
+        case [.shift]:
+            return handleBlockReferenceCommand(.outdent)
+        default:
+            return false
+        }
     }
 
     /// Intercept the physical key before AppKit's automatic bracket pairing

@@ -164,4 +164,52 @@ struct TabIndentInvalidationTests {
             "Shift-Tab invalidated far-away content: \(distantEdits) (doc length \(ns.length))"
         )
     }
+
+    @Test("Tab from before an atomic copied reference indents its line")
+    func tabIndentsAtomicReferenceFromCaretBefore() throws {
+        let reference = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let source = "  \(reference)"
+        let stack = makeEditor(text: source)
+        let token = try #require(MarkdownBlockReferenceSyntax.tokens(in: source).first)
+        stack.textView.setSelectedRange(
+            NSRange(location: token.range.location, length: 0)
+        )
+
+        #expect(
+            stack.coordinator.textView(
+                stack.textView,
+                doCommandBy: #selector(NSResponder.insertTab(_:))
+            )
+        )
+        #expect(stack.textView.string == "\t\(source)")
+        #expect(stack.textView.selectedRange() == NSRange(location: 0, length: 0))
+    }
+
+    @Test("physical Tab before an atomic copied reference stays in the editor")
+    func physicalTabIndentsAtomicReferenceFromCaretBefore() throws {
+        let reference = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let source = "  \(reference)"
+        let stack = makeEditor(text: source)
+        let token = try #require(MarkdownBlockReferenceSyntax.tokens(in: source).first)
+        stack.textView.setSelectedRange(
+            NSRange(location: token.range.location, length: 0)
+        )
+        let tab = try #require(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "\t",
+            charactersIgnoringModifiers: "\t",
+            isARepeat: false,
+            keyCode: 48
+        ))
+
+        stack.textView.keyDown(with: tab)
+
+        #expect(stack.textView.string == "\t\(source)")
+        #expect(stack.textView.selectedRange() == NSRange(location: 0, length: 0))
+    }
 }
