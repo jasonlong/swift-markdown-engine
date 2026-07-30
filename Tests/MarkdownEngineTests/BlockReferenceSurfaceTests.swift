@@ -135,7 +135,8 @@ struct BlockReferenceSurfaceTests {
     @Test("a legacy list-contained reference receives the same host surface")
     func listContainedReferenceIsRendered() throws {
         _ = NSApplication.shared
-        let source = "- ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let source =
+            "  - [ ] ![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 120))
         let scrollView = NSScrollView(frame: root.bounds)
         let container = NativeTextViewContainer(frame: root.bounds)
@@ -157,6 +158,21 @@ struct BlockReferenceSurfaceTests {
         textView.blockReferenceSurfaceProvider = { _, _, _ in
             MarkdownBlockReferenceSurface(view: ProofSurface(), height: 28)
         }
+        textView.textStorage?.addAttribute(
+            .bulletMarker,
+            value: true,
+            range: NSRange(location: 2, length: 1)
+        )
+        textView.textStorage?.addAttribute(
+            .taskCheckbox,
+            value: false,
+            range: NSRange(location: 4, length: 3)
+        )
+        textView.textStorage?.addAttribute(
+            .listMarkerPrefix,
+            value: true,
+            range: NSRange(location: 0, length: 8)
+        )
 
         root.layoutSubtreeIfNeeded()
         textView.updateBlockReferenceSurfaces()
@@ -176,6 +192,42 @@ struct BlockReferenceSurfaceTests {
                 at: 0,
                 effectiveRange: nil
             ) as? NSColor) == .clear
+        )
+        for key in [
+            NSAttributedString.Key.bulletMarker,
+            .taskCheckbox,
+            .listMarkerPrefix,
+        ] {
+            #expect(
+                textView.textStorage?.attribute(
+                    key,
+                    at: key == .taskCheckbox ? 4 : 2,
+                    effectiveRange: nil
+                ) == nil
+            )
+        }
+
+        textView.removeBlockReferenceSurfaces()
+        #expect(
+            textView.textStorage?.attribute(
+                .bulletMarker,
+                at: 2,
+                effectiveRange: nil
+            ) as? Bool == true
+        )
+        #expect(
+            textView.textStorage?.attribute(
+                .taskCheckbox,
+                at: 4,
+                effectiveRange: nil
+            ) as? Bool == false
+        )
+        #expect(
+            textView.textStorage?.attribute(
+                .listMarkerPrefix,
+                at: 2,
+                effectiveRange: nil
+            ) as? Bool == true
         )
     }
 

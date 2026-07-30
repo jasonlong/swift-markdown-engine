@@ -4,6 +4,9 @@ private extension NSAttributedString.Key {
     static let markdownBlockReferenceSurface = NSAttributedString.Key("MarkdownEngine.blockReferenceSurface")
     static let markdownBlockReferenceOriginalParagraph = NSAttributedString.Key("MarkdownEngine.blockReference.originalParagraph")
     static let markdownBlockReferenceOriginalLink = NSAttributedString.Key("MarkdownEngine.blockReference.originalLink")
+    static let markdownBlockReferenceOriginalBulletMarker = NSAttributedString.Key("MarkdownEngine.blockReference.originalBulletMarker")
+    static let markdownBlockReferenceOriginalTaskCheckbox = NSAttributedString.Key("MarkdownEngine.blockReference.originalTaskCheckbox")
+    static let markdownBlockReferenceOriginalListMarkerPrefix = NSAttributedString.Key("MarkdownEngine.blockReference.originalListMarkerPrefix")
 }
 
 extension NativeTextView {
@@ -49,6 +52,25 @@ extension NativeTextView {
                 storage.addAttribute(.markdownBlockReferenceOriginalLink, value: link, range: token.range)
             }
             storage.removeAttribute(.link, range: token.range)
+            preserveAndRemoveBlockReferenceAttribute(
+                .bulletMarker,
+                backupKey: .markdownBlockReferenceOriginalBulletMarker,
+                range: token.range,
+                storage: storage
+            )
+            preserveAndRemoveBlockReferenceAttribute(
+                .taskCheckbox,
+                backupKey: .markdownBlockReferenceOriginalTaskCheckbox,
+                range: token.range,
+                storage: storage
+            )
+            preserveAndRemoveBlockReferenceAttribute(
+                .listMarkerPrefix,
+                backupKey:
+                    .markdownBlockReferenceOriginalListMarkerPrefix,
+                range: token.range,
+                storage: storage
+            )
             storage.addAttributes([
                 .markdownBlockReferenceSurface: true,
                 .foregroundColor: NSColor.clear,
@@ -145,6 +167,69 @@ extension NativeTextView {
         for (value, range) in links {
             storage.addAttribute(.link, value: value, range: range)
             storage.removeAttribute(.markdownBlockReferenceOriginalLink, range: range)
+        }
+        restoreBlockReferenceAttribute(
+            .bulletMarker,
+            backupKey: .markdownBlockReferenceOriginalBulletMarker,
+            storage: storage,
+            fullRange: fullRange
+        )
+        restoreBlockReferenceAttribute(
+            .taskCheckbox,
+            backupKey: .markdownBlockReferenceOriginalTaskCheckbox,
+            storage: storage,
+            fullRange: fullRange
+        )
+        restoreBlockReferenceAttribute(
+            .listMarkerPrefix,
+            backupKey:
+                .markdownBlockReferenceOriginalListMarkerPrefix,
+            storage: storage,
+            fullRange: fullRange
+        )
+    }
+
+    private func preserveAndRemoveBlockReferenceAttribute(
+        _ attribute: NSAttributedString.Key,
+        backupKey: NSAttributedString.Key,
+        range: NSRange,
+        storage: NSTextStorage
+    ) {
+        var values: [(value: Any, range: NSRange)] = []
+        storage.enumerateAttribute(attribute, in: range) {
+            value, effectiveRange, _ in
+            guard let value else { return }
+            values.append((value, effectiveRange))
+        }
+        for entry in values {
+            storage.addAttribute(
+                backupKey,
+                value: entry.value,
+                range: entry.range
+            )
+        }
+        storage.removeAttribute(attribute, range: range)
+    }
+
+    private func restoreBlockReferenceAttribute(
+        _ attribute: NSAttributedString.Key,
+        backupKey: NSAttributedString.Key,
+        storage: NSTextStorage,
+        fullRange: NSRange
+    ) {
+        var values: [(value: Any, range: NSRange)] = []
+        storage.enumerateAttribute(backupKey, in: fullRange) {
+            value, range, _ in
+            guard let value else { return }
+            values.append((value, range))
+        }
+        for entry in values {
+            storage.addAttribute(
+                attribute,
+                value: entry.value,
+                range: entry.range
+            )
+            storage.removeAttribute(backupKey, range: entry.range)
         }
     }
 
