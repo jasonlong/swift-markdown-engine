@@ -516,6 +516,58 @@ struct BlockReferenceSurfaceTests {
         #expect(abs(nestedSurface.frame.minX + markerCenterOffset - nestedMarkerX) < 1)
     }
 
+    @Test("copied surfaces reserve native list row spacing")
+    func copiedSurfaceUsesNativeListRowMetrics() throws {
+        _ = NSApplication.shared
+        let source = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]"
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 180))
+        let container = NativeTextViewContainer(frame: root.bounds)
+        let textView = NativeTextView(frame: root.bounds)
+        root.addSubview(container)
+        container.textView = textView
+        container.addSubview(textView)
+        let font = NSFont.systemFont(ofSize: 16)
+        textView.baseFont = font
+        textView.font = font
+        textView.configuration.lists.extraLineHeight = 3
+        textView.configuration.paragraph.lineHeightExtraSpacing = 2
+        textView.configuration.paragraph.spacingFactor = 0.3
+        textView.string = source
+        let bridge = LayoutBridge(try #require(textView.textLayoutManager))
+        textView.layoutBridge = bridge
+        textView.blockReferencePresentationProvider = { _ in
+            MarkdownBlockReferencePresentation(
+                state: .resolved,
+                sourceLabel: "Weekly",
+                markdown: "- Source item"
+            )
+        }
+        textView.blockReferenceSurfaceProvider = { _, _, _ in
+            MarkdownBlockReferenceSurface(view: ProofSurface(), height: 20)
+        }
+
+        root.layoutSubtreeIfNeeded()
+        textView.updateBlockReferenceSurfaces()
+
+        let paragraph = try #require(
+            textView.textStorage?.attribute(
+                .paragraphStyle,
+                at: 0,
+                effectiveRange: nil
+            ) as? NSParagraphStyle
+        )
+        let naturalLineHeight = ceil(
+            font.ascender - font.descender + font.leading
+        )
+        let expectedLineHeight = naturalLineHeight + 2
+        #expect(paragraph.minimumLineHeight == expectedLineHeight)
+        #expect(paragraph.maximumLineHeight == expectedLineHeight)
+        #expect(paragraph.lineSpacing == 3)
+        #expect(paragraph.paragraphSpacing == ceil(naturalLineHeight * 0.3))
+        let surface = try #require(textView.blockReferenceSurfaceViews.first)
+        #expect(surface.frame.height == expectedLineHeight)
+    }
+
     @Test("native caret is suppressed at copied-node boundaries")
     func nativeCaretIsSuppressedAtCopiedNodeBoundaries() throws {
         let source = "![[Weekly#^01hzy7vz8g4qj6m2n3r5t7w9xy]]\nAfter"

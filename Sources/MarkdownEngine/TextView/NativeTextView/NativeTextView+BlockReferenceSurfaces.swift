@@ -35,7 +35,8 @@ extension NativeTextView {
             token: MarkdownBlockReferenceToken,
             surface: MarkdownBlockReferenceSurface,
             visualIndent: CGFloat,
-            availableWidth: CGFloat
+            availableWidth: CGFloat,
+            layoutHeight: CGFloat
         )] = []
         storage.beginEditing()
         for token in MarkdownBlockReferenceSyntax.tokens(in: source) where token.kind == .transclusion {
@@ -53,8 +54,29 @@ extension NativeTextView {
             let existingParagraph = (storage.attribute(.paragraphStyle, at: token.range.location, effectiveRange: nil)
                 as? NSParagraphStyle) ?? NSParagraphStyle.default
             let paragraph = existingParagraph.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
-            paragraph.minimumLineHeight = max(paragraph.minimumLineHeight, surface.height)
-            paragraph.maximumLineHeight = max(paragraph.maximumLineHeight, surface.height)
+            let layoutHeight = blockReferenceListLineHeight(
+                including: surface.height
+            )
+            paragraph.minimumLineHeight = max(
+                paragraph.minimumLineHeight,
+                layoutHeight
+            )
+            paragraph.maximumLineHeight = max(
+                paragraph.maximumLineHeight,
+                layoutHeight
+            )
+            paragraph.lineSpacing = max(
+                paragraph.lineSpacing,
+                configuration.lists.extraLineHeight
+            )
+            paragraph.paragraphSpacing = max(
+                paragraph.paragraphSpacing,
+                blockReferenceListParagraphSpacing
+            )
+            paragraph.paragraphSpacingBefore = max(
+                0,
+                paragraph.paragraphSpacingBefore
+            )
             paragraph.lineBreakMode = .byClipping
             storage.addAttribute(.markdownBlockReferenceOriginalParagraph, value: existingParagraph, range: paragraphRange)
             storage.addAttribute(.paragraphStyle, value: paragraph, range: paragraphRange)
@@ -87,7 +109,13 @@ extension NativeTextView {
                 .font: NSFont.systemFont(ofSize: 0.1),
                 .kern: -0.1,
             ], range: token.range)
-            pending.append((token, surface, visualIndent, surfaceWidth))
+            pending.append((
+                token,
+                surface,
+                visualIndent,
+                surfaceWidth,
+                layoutHeight
+            ))
         }
         storage.endEditing()
 
@@ -116,7 +144,7 @@ extension NativeTextView {
                 x: surfaceX,
                 y: frame.minY + textContainerOrigin.y + tokenRect.minY,
                 width: entry.availableWidth,
-                height: entry.surface.height
+                height: entry.layoutHeight
             )
             entry.surface.view.frame = frame.integral
             if let interactive =
@@ -170,6 +198,25 @@ extension NativeTextView {
             + configuration.lists.firstLevelIndent
             + visualIndent
             + markerWidth / 2
+    }
+
+    /// Host rows represent outline items even when their source token is a
+    /// standalone reference. Reserve the same text height and after-row gap a
+    /// native list item receives, so the next row never closes up around one.
+    private func blockReferenceListLineHeight(
+        including surfaceHeight: CGFloat
+    ) -> CGFloat {
+        let nativeLineHeight = ceil(
+            baseFont.ascender - baseFont.descender + baseFont.leading
+        ) + configuration.paragraph.lineHeightExtraSpacing
+        return max(surfaceHeight, nativeLineHeight)
+    }
+
+    private var blockReferenceListParagraphSpacing: CGFloat {
+        let nativeLineHeight = ceil(
+            baseFont.ascender - baseFont.descender + baseFont.leading
+        )
+        return ceil(nativeLineHeight * configuration.paragraph.spacingFactor)
     }
 
     func removeBlockReferenceSurfaces() {
